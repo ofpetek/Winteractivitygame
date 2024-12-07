@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Winteraktivitäten Spiel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f0f8ff;
+      padding: 20px;
+    }
+    img {
+      max-width: 300px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .button:hover {
+      background-color: #45a049;
+    }
+    .question {
+      font-size: 24px;
+      margin-top: 20px;
+    }
+    .input-answer {
+      padding: 10px;
+      font-size: 18px;
+      width: 200px;
+    }
+    .feedback {
+      font-size: 20px;
+      color: #ff6347;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Winteraktivitäten Spiel</h1>
+  <p class="question">Was machen diese Leute?</p>
+
+  <!-- Image section -->
+  <img id="activityImage" src="" alt="Winteraktivität Bild">
+
+  <br><br>
+
+  <input type="text" id="answerInput" class="input-answer" placeholder="Antwort eingeben...">
+  <button class="button" onclick="checkAnswer()">Antwort überprüfen</button>
+
+  <p id="feedback" class="feedback"></p>
+
+  <button class="button" onclick="nextImage()">Nächste Aktivität</button>
+
+  <script>
+    const activities = [
+      { image: 'Schlittschuh_fahren?text=Schlittschuh+fahren', answer: 'Schlittschuh fahren' },
+      { image: 'https://via.placeholder.com/300x200.png?text=Schlitten+fahren', answer: 'Schlitten fahren' },
+      { image: 'Schneeballschlacht.jpeg?text=Schneeballschlacht', answer: 'Schneeballschlacht' },
+      { image: 'https://via.placeholder.com/300x200.png?text=Weihnachtsbaum+schmuecken', answer: 'Weihnachtsbaum schmücken' },
+      { image: 'https://via.placeholder.com/300x200.png?text=Ski+fahren', answer: 'Ski fahren' },
+      { image: 'https://via.placeholder.com/300x200.png?text=Schneemann+bauen', answer: 'Schneemann bauen' }
+    ];
+
+    let currentActivityIndex = 0;
+
+    function nextImage() {
+      // Clear previous answer and feedback
+      document.getElementById('answerInput').value = '';
+      document.getElementById('feedback').innerText = '';
+      
+      // Move to next activity
+      currentActivityIndex = (currentActivityIndex + 1) % activities.length;
+      
+      // Update image
+      document.getElementById('activityImage').src = activities[currentActivityIndex].image;
+    }
+
+    function checkAnswer() {
+      const userAnswer = document.getElementById('answerInput').value.trim();
+      const correctAnswer = activities[currentActivityIndex].answer;
+      
+      if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+        document.getElementById('feedback').innerText = 'Richtig! Gut gemacht.';
+      } else {
+        document.getElementById('feedback').innerText = `Falsch! Die richtige Antwort ist: ${correctAnswer}`;
+      }
+    }
+
+    // Initialize first activity image
+    nextImage();
+  </script>
+</body>
+</html>

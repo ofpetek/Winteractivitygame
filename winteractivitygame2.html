@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Winteraktivitäten Spiel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f0f8ff;
+      padding: 20px;
+    }
+    img {
+      max-width: 300px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    .button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .button:hover {
+      background-color: #45a049;
+    }
+    .question {
+      font-size: 24px;
+      margin-top: 20px;
+    }
+    .feedback {
+      font-size: 20px;
+      color: #ff6347;
+      margin-top: 10px;
+    }
+    input[type="text"] {
+      padding: 8px;
+      font-size: 16px;
+      margin-top: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Winteraktivitäten Spiel</h1>
+  <p id="question" class="question">Was machen diese Leute?</p>
+
+  <!-- Image section -->
+  <img id="activityImage" src="" alt="Winteraktivität Bild">
+
+  <br><br>
+
+  <!-- Text Input option -->
+  <input type="text" id="textInput" placeholder="Antwort eingeben">
+  <button class="button" onclick="checkTextInput()">Antwort eingeben</button>
+
+  <!-- Speech recognition option -->
+  <button class="button" onclick="startSpeechRecognition()">Antwort sprechen</button>
+  <button class="button" onclick="nextImage()">Nächste Aktivität</button>
+
+  <p id="feedback" class="feedback"></p>
+
+  <script>
+    const activities = [
+      { image: 'schlittschuh_fahren.jpeg?text=Schlittschuh+fahren', answer: ['Sie fahren Schlittschuh.', 'Schlittschuh fahren'] },
+      { image: 'schlitten_fahren.jpeg?text=Schlitten+fahren', answer: ['Sie fahren Schlitten.', 'Schlitten fahren'] },
+      { image: 'schneeballschlacht.jpeg?text=Schneeballschlacht', answer: ['Sie machen eine Schneeballschlacht.', 'Schneeballschlacht'] },
+      { image: 'weihnachtsbaum_schmuecken.jpeg?text=Weihnachtsbaum+schmuecken', answer: ['Sie schmücken einen Weihnachtsbaum.', 'Weihnachtsbaum schmücken'] },
+      { image: 'Ski fahren.jpeg? text=Ski+fahren', answer: ['Sie fahren Ski.', 'Ski fahren'] },
+      { image: 'schneemann_machen.jpeg?text=Schneemann+bauen', answer: ['Sie bauen einen Schneemann.', 'Schneemann bauen'] }
+    ];
+
+    let currentActivityIndex = 0;
+
+    // Initialize first activity image
+    nextImage();
+
+    // Function to start speech recognition
+    function startSpeechRecognition() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'de-DE'; // Set to German
+      recognition.start();
+
+      recognition.onstart = function() {
+        console.log("Spracherkennung gestartet...");
+      };
+
+      recognition.onresult = function(event) {
+        const spokenAnswer = event.results[0][0].transcript;
+        console.log("Erkannte Antwort:", spokenAnswer);
+        checkAnswer(spokenAnswer);
+      };
+
+      recognition.onerror = function(event) {
+        console.error("Fehler bei der Spracherkennung:", event.error);
+      };
+    }
+
+    // Function to check the spoken or typed answer (allow short answers)
+    function checkAnswer(spokenAnswer) {
+      const correctAnswers = activities[currentActivityIndex].answer;
+      
+      // Clean and normalize the spoken answer
+      const cleanSpokenAnswer = spokenAnswer.replace(/[.?!,;:]/g, '').toLowerCase();
+
+      // Check if the answer matches any of the valid answers (full sentence or short form)
+      const isCorrect = correctAnswers.some(answer => answer.toLowerCase() === cleanSpokenAnswer);
+
+      if (isCorrect) {
+        document.getElementById('feedback').innerText = 'Richtig! Gut gemacht.';
+        speak("Richtig! Gut gemacht.");
+      } else {
+        document.getElementById('feedback').innerText = `Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`;
+        speak(`Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`);
+      }
+    }
+
+    // Function to check the text input answer
+    function checkTextInput() {
+      const textInput = document.getElementById('textInput').value;
+      if (textInput) {
+        checkAnswer(textInput);
+      }
+    }
+
+    // Function to change to the next image
+    function nextImage() {
+      // Clear previous feedback
+      document.getElementById('feedback').innerText = '';
+      document.getElementById('textInput').value = '';  // Clear text input
+      
+      // Move to next activity
+      currentActivityIndex = (currentActivityIndex + 1) % activities.length;
+      
+      // Update image
+      document.getElementById('activityImage').src = activities[currentActivityIndex].image;
+      
+      // Ask the question aloud
+      speak("Was machen diese Leute?");
+    }
+
+    // Function for text-to-speech with German voice
+    function speak(text) {
+      const speech = new SpeechSynthesisUtterance();
+      speech.lang = 'de-DE'; // Set language to German
+      speech.text = text;
+
+      // Select a German voice explicitly (if available)
+      const voices = window.speechSynthesis.getVoices();
+      const germanVoice = voices.find(voice => voice.lang === 'de-DE');
+      
+      if (germanVoice) {
+        speech.voice = germanVoice;
+      }
+
+      window.speechSynthesis.speak(speech);
+    }
+  </script>
+</body>
+</html>

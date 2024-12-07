@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Winteraktivitäten Spiel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f0f8ff;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    img {
+      max-width: 300px;
+      border-radius: 10px;
+      margin-top: 20px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease;
+    }
+    img:hover {
+      transform: scale(1.05);
+    }
+    .button {
+      padding: 12px 24px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px;
+      transition: all 0.3s ease;
+    }
+    .button:hover {
+      background-color: #45a049;
+      transform: translateY(-2px);
+    }
+    .button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .question {
+      font-size: 24px;
+      margin-top: 20px;
+      color: #333;
+    }
+    .feedback {
+      font-size: 20px;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+    }
+    .feedback.correct {
+      color: #4CAF50;
+      background-color: #e8f5e9;
+    }
+    .feedback.incorrect {
+      color: #f44336;
+      background-color: #ffebee;
+    }
+    input[type="text"] {
+      padding: 12px;
+      font-size: 16px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: 2px solid #ddd;
+      width: 250px;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+    .loading {
+      display: none;
+      margin: 10px auto;
+    }
+    .progress {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #666;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      img {
+        max-width: 100%;
+      }
+      .button {
+        width: 100%;
+        margin: 5px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Winteraktivitäten Spiel</h1>
+  <p id="question" class="question">Was machen diese Leute?</p>
+  <div class="progress">Frage <span id="currentQuestion">1</span> von <span id="totalQuestions">6</span></div>
+
+  <!-- Image section -->
+  <div id="imageContainer">
+    <img id="activityImage" src="" alt="Winteraktivität Bild">
+    <div id="loading" class="loading">Laden...</div>
+  </div>
+
+  <br><br>
+
+  <!-- Text Input option -->
+  <div>
+    <input type="text" id="textInput" placeholder="Antwort eingeben" aria-label="Antwort eingeben">
+    <button class="button" onclick="checkTextInput()" id="submitButton">Antwort eingeben</button>
+  </div>
+
+  <!-- Speech recognition option -->
+  <div>
+    <button class="button" onclick="startSpeechRecognition()" id="speechButton">
+      <span id="speechButtonText">Antwort sprechen</span>
+    </button>
+    <button class="button" onclick="nextImage()" id="nextButton">Nächste Aktivität</button>
+  </div>
+
+  <p id="feedback" class="feedback"></p>
+
+  <script>
+    const activities = [
+      { image: 'https://k00.fr/qs1iix3l?text=Schlittschuh+fahren', answer: ['Sie fahren Schlittschuh.', 'Schlittschuh fahren', 'schlittschuh fahren', 'schlittschuhlaufen'] },
+      { image: 'https://imgur.com/TQcalxw?text=Schlitten+fahren', answer: ['Sie fahren Schlitten.', 'Schlitten fahren', 'schlitten fahren', 'rodeln'] },
+      { image: 'https://k00.fr/9b1uebz0?text=Schneeballschlacht', answer: ['Sie machen eine Schneeballschlacht.', 'Schneeballschlacht', 'schneeballschlacht'] },
+      { image: 'https://k00.fr/xk44hyab?text=Weihnachtsbaum+schmuecken', answer: ['Sie schmücken einen Weihnachtsbaum.', 'Weihnachtsbaum schmücken', 'weihnachtsbaum schmücken'] },
+      { image: 'https://k00.fr/b56bbgib?text=Ski+fahren', answer: ['Sie fahren Ski.', 'Ski fahren', 'ski fahren', 'skifahren'] },
+      { image: 'https://k00.fr/eckgx7ph?text=Schneemann+bauen', answer: ['Sie bauen einen Schneemann.', 'Schneemann bauen', 'schneemann bauen'] }
+    ];
+
+    let currentActivityIndex = 0;
+    let isListening = false;
+
+    // Initialize the game
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('totalQuestions').textContent = activities.length;
+      nextImage();
+      updateProgress();
+    });
+
+    // Function to update progress
+    function updateProgress() {
+      document.getElementById('currentQuestion').textContent = currentActivityIndex + 1;
+    }
+
+    // Function to start speech recognition
+    function startSpeechRecognition() {
+      if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+        alert('Spracherkennung wird in diesem Browser leider nicht unterstützt.');
+        return;
+      }
+
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      const speechButton = document.getElementById('speechButton');
+      const speechButtonText = document.getElementById('speechButtonText');
+
+      recognition.lang = 'de-DE';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      if (!isListening) {
+        recognition.start();
+        isListening = true;
+        speechButtonText.textContent = 'Zuhören...';
+        speechButton.style.backgroundColor = '#ff6347';
+      } else {
+        recognition.stop();
+        isListening = false;
+        speechButtonText.textContent = 'Antwort sprechen';
+        speechButton.style.backgroundColor = '#4CAF50';
+      }
+
+      recognition.onstart = () => {
+        console.log("Spracherkennung gestartet...");
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        speechButtonText.textContent = 'Antwort sprechen';
+        speechButton.style.backgroundColor = '#4CAF50';
+      };
+
+      recognition.onresult = (event) => {
+        const spokenAnswer = event.results[0][0].transcript;
+        console.log("Erkannte Antwort:", spokenAnswer);
+        checkAnswer(spokenAnswer);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Fehler bei der Spracherkennung:", event.error);
+        isListening = false;
+        speechButtonText.textContent = 'Antwort sprechen';
+        speechButton.style.backgroundColor = '#4CAF50';
+        alert('Es gab einen Fehler bei der Spracherkennung. Bitte versuchen Sie es erneut.');
+      };
+    }
+
+    // Function to check the answer
+    function checkAnswer(userAnswer) {
+      const correctAnswers = activities[currentActivityIndex].answer;
+      const feedback = document.getElementById('feedback');
+      
+      // Clean and normalize the user answer
+      const cleanUserAnswer = userAnswer.trim().replace(/[.?!,;:]/g, '').toLowerCase();
+
+      // Check if the answer matches any of the valid answers
+      const isCorrect = correctAnswers.some(answer => 
+        answer.toLowerCase().replace(/[.?!,;:]/g, '').includes(cleanUserAnswer) ||
+        cleanUserAnswer.includes(answer.toLowerCase().replace(/[.?!,;:]/g, ''))
+      );
+
+      feedback.className = isCorrect ? 'feedback correct' : 'feedback incorrect';
+      
+      if (isCorrect) {
+        feedback.innerText = 'Richtig! Gut gemacht.';
+        speak("Richtig! Gut gemacht.");
+        document.getElementById('nextButton').focus();
+      } else {
+        feedback.innerText = `Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`;
+        speak(`Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`);
+      }
+    }
+
+    // Function to check the text input answer
+    function checkTextInput() {
+      const textInput = document.getElementById('textInput');
+      const userAnswer = textInput.value.trim();
+      
+      if (userAnswer) {
+        checkAnswer(userAnswer);
+        textInput.value = '';
+      } else {
+        alert('Bitte geben Sie eine Antwort ein.');
+      }
+    }
+
+    // Add event listener for Enter key on text input
+    document.getElementById('textInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        checkTextInput();
+      }
+    });
+
+    // Function to change to the next image
+    function nextImage() {
+      const feedback = document.getElementById('feedback');
+      const textInput = document.getElementById('textInput');
+      const imageElement = document.getElementById('activityImage');
+      const loading = document.getElementById('loading');
+
+      // Clear previous state
+      feedback.innerText = '';
+      feedback.className = 'feedback';
+      textInput.value = '';
+      
+      // Move to next activity
+      currentActivityIndex = (currentActivityIndex + 1) % activities.length;
+      updateProgress();
+      
+      // Show loading state
+      imageElement.style.display = 'none';
+      loading.style.display = 'block';
+      
+      // Load new image
+      const img = new Image();
+      img.onload = () => {
+        imageElement.src = activities[currentActivityIndex].image;
+        imageElement.style.display = 'block';
+        loading.style.display = 'none';
+        speak("Was machen diese Leute?");
+      };
+      img.onerror = () => {
+        alert('Fehler beim Laden des Bildes. Bitte versuchen Sie es erneut.');
+        loading.style.display = 'none';
+      };
+      img.src = activities[currentActivityIndex].image;
+    }
+
+    // Function for text-to-speech with German voice
+    function speak(text) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+
+      const speech = new SpeechSynthesisUtterance();
+      speech.lang = 'de-DE';
+      speech.text = text;
+
+      // Try to select a German voice
+      window.speechSynthesis.onvoiceschanged = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const germanVoice = voices.find(voice => voice.lang === 'de-DE');
+        if (germanVoice) {
+          speech.voice = germanVoice;
+        }
+      };
+
+      window.speechSynthesis.speak(speech);
+    }
+  </script>
+</body>
+</html>
