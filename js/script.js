@@ -3,6 +3,18 @@ document.addEventListener('DOMContentLoaded', () => {
   startGame();
 });
 
+let currentActivityIndex = -1;
+let previousActivityIndex = -1;
+
+// Function to get random activity index (different from previous)
+function getRandomActivityIndex() {
+  const availableIndices = Array.from({ length: activities.length }, (_, i) => i).filter(i => i !== currentActivityIndex);
+  currentActivityIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+  debugger;
+  console.log(`Chosen activity index: ${currentActivityIndex}`); // Log the chosen index
+  return currentActivityIndex;
+}
+
 // Function to start speech recognition
 function startSpeechRecognition() {
   const micButton = document.getElementById('micButton');
@@ -73,8 +85,8 @@ function nextImage() {
   // Clear previous feedback
   document.getElementById('feedback').textContent = '';
   
-  // Move to next activity
-  currentActivityIndex = (currentActivityIndex + 1) % activities.length;
+  // Get random activity index
+  getRandomActivityIndex();
   
   // Update image and speak question
   const currentActivity = activities[currentActivityIndex];
