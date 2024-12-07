@@ -8,80 +8,124 @@
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      background-color: #f0f8ff;
       padding: 20px;
+      background-color: #f0f8ff;
     }
-    img {
-      max-width: 300px;
-      border-radius: 10px;
-      margin-top: 20px;
-    }
-    .button {
-      padding: 10px 20px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    .button:hover {
-      background-color: #45a049;
-    }
+    
     .question {
       font-size: 24px;
-      margin-top: 20px;
+      margin: 20px 0;
+      color: #2c3e50;
     }
-    .feedback {
-      font-size: 20px;
-      color: #ff6347;
-      margin-top: 10px;
+    
+    #activityImage {
+      max-width: 500px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      margin: 20px 0;
     }
-    input[type="text"] {
-      padding: 8px;
+    
+    .button {
+      padding: 10px 20px;
       font-size: 16px;
-      margin-top: 10px;
+      margin: 10px;
+      border: none;
+      background-color: #3498db;
+      color: white;
+      cursor: pointer;
       border-radius: 5px;
+      transition: all 0.3s ease;
     }
-    .voice-selection {
+    
+    .button:hover {
+      background-color: #2980b9;
+    }
+    
+    .mic-button {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      margin: 20px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    
+    .mic-button:hover {
+      background-color: #c0392b;
+      transform: scale(1.05);
+    }
+    
+    .mic-button.recording {
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+    }
+    
+    .feedback {
       margin-top: 20px;
+      font-size: 18px;
+      min-height: 27px;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin: 20px 0;
     }
   </style>
 </head>
 <body>
-
   <h1>Winteraktivitäten Spiel</h1>
+
   <p id="question" class="question">Was machen diese Leute?</p>
 
   <!-- Image section -->
   <img id="activityImage" src="" alt="Winteraktivität Bild">
 
-  <br><br>
-
-  <!-- Text Input option -->
-  <input type="text" id="textInput" placeholder="Antwort eingeben">
-  <button class="button" onclick="checkTextInput()">Antwort eingeben</button>
-
-  <!-- Speech recognition option -->
-  <button class="button" onclick="startSpeechRecognition()">Antwort sprechen</button>
-  <button class="button" onclick="nextImage()">Nächste Aktivität</button>
-
-  <div class="voice-selection">
-    <label for="voiceSelect">Stimme auswählen:</label>
-    <select id="voiceSelect" onchange="speak(document.getElementById('question').textContent)">
-    </select>
+  <div class="controls">
+    <button class="mic-button" onclick="startSpeechRecognition()" id="micButton">🎤</button>
+    <button class="button" onclick="nextImage()">Nächste Aktivität</button>
   </div>
 
   <p id="feedback" class="feedback"></p>
 
   <script>
     const activities = [
-      { image: 'schlittschuh_fahren.jpeg?text=Schlittschuh+fahren', answer: ['Sie fahren Schlittschuh.', 'Schlittschuh fahren'] },
-      { image: 'schlitten_fahren.jpeg?text=Schlitten+fahren', answer: ['Sie fahren Schlitten.', 'Schlitten fahren'] },
-      { image: 'schneeballschlacht.jpeg?text=Schneeballschlacht', answer: ['Sie machen eine Schneeballschlacht.', 'Schneeballschlacht'] },
-      { image: 'weihnachtsbaum_schmuecken.jpeg?text=Weihnachtsbaum+schmuecken', answer: ['Sie schmücken einen Weihnachtsbaum.', 'Weihnachtsbaum schmücken'] },
-      { image: 'Ski fahren.jpeg? text=Ski+fahren', answer: ['Sie fahren Ski.', 'Ski fahren'] },
-      { image: 'schneemann_machen.jpeg?text=Schneemann+bauen', answer: ['Sie bauen einen Schneemann.', 'Schneemann bauen'] }
+      { image: 'schlittschuh_fahren.jpeg', answer: ['Sie fahren Schlittschuh.', 'Schlittschuh fahren'] },
+      { image: 'schlitten_fahren.jpeg', answer: ['Sie fahren Schlitten.', 'Schlitten fahren'] },
+      { image: 'schneeballschlacht.jpeg', answer: ['Sie machen eine Schneeballschlacht.', 'Schneeballschlacht'] },
+      { image: 'weihnachtsbaum_schmuecken.jpeg', answer: ['Sie schmücken einen Weihnachtsbaum.', 'Weihnachtsbaum schmücken'] },
+      { image: 'Ski fahren.jpeg', answer: ['Sie fahren Ski.', 'Ski fahren'] },
+      { image: 'schneemann_machen.jpeg', answer: ['Sie bauen einen Schneemann.', 'Schneemann bauen'] },
+      { image: 'caraoussel_fahren.jpeg', answer: ['Sie fahren Karussell.', 'Karussell fahren'] },
+      { image: 'einkaufen_gehen.jpeg', answer: ['Sie gehen einkaufen.', 'Einkaufen gehen'] },
+      { image: 'eishockey_spielen.jpeg', answer: ['Sie spielen Eishockey.', 'Eishockey spielen'] },
+      { image: 'santa_sprechen.jpeg', answer: ['Sie sprechen mit dem Weihnachtsmann.', 'Mit dem Weihnachtsmann sprechen'] },
+      { image: 'weihnachtsbaum_heimtragen.jpeg', answer: ['Sie tragen den Weihnachtsbaum nach Hause.', 'Weihnachtsbaum nach Hause tragen'] }
     ];
 
     let currentActivityIndex = 0;
@@ -129,19 +173,10 @@
       }
     }
 
-    // Function to check the text input answer
-    function checkTextInput() {
-      const textInput = document.getElementById('textInput').value;
-      if (textInput) {
-        checkAnswer(textInput);
-      }
-    }
-
     // Function to change to the next image
     function nextImage() {
       // Clear previous feedback
       document.getElementById('feedback').innerText = '';
-      document.getElementById('textInput').value = '';  // Clear text input
       
       // Move to next activity
       currentActivityIndex = (currentActivityIndex + 1) % activities.length;
@@ -169,24 +204,6 @@
 
       window.speechSynthesis.speak(speech);
     }
-
-    // Populate the voice selection dropdown
-    function populateVoiceList() {
-      const voiceSelect = document.getElementById('voiceSelect');
-      const voices = window.speechSynthesis.getVoices();
-
-      voices.forEach((voice) => {
-        if (voice.lang === 'de-DE') { // Filter for German voices
-          const option = document.createElement('option');
-          option.value = voice.name;
-          option.textContent = `${voice.name} (${voice.lang})`;
-          voiceSelect.appendChild(option);
-        }
-      });
-    }
-
-    // Fetch voices when they are loaded
-    window.speechSynthesis.onvoiceschanged = populateVoiceList;
   </script>
 </body>
 </html>
