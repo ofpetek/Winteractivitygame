@@ -1,95 +1,97 @@
-document.addEventListener('DOMContentLoaded', () => {
-  // Initialize game
-  startGame();
-});
+const activities = [
+    { image: 'schlittschuh_fahren.jpeg', answer: ['Sie fahren Schlittschuh.', 'Schlittschuh fahren'] },
+    { image: 'schlitten_fahren.jpeg', answer: ['Sie fahren Schlitten.', 'Schlitten fahren'] },
+    { image: 'schneeballschlacht.jpeg', answer: ['Sie machen eine Schneeballschlacht.', 'Schneeballschlacht'] },
+    { image: 'weihnachtsbaum_schmuecken.jpeg', answer: ['Sie schmücken einen Weihnachtsbaum.', 'Weihnachtsbaum schmücken'] },
+    { image: 'Ski fahren.jpeg', answer: ['Sie fahren Ski.', 'Ski fahren'] },
+    { image: 'schneemann_machen.jpeg', answer: ['Sie bauen einen Schneemann.', 'Schneemann bauen'] },
+    { image: 'caraoussel_fahren.jpeg', answer: ['Sie fahren Karussell.', 'Karussell fahren'] },
+    { image: 'einkaufen_gehen.jpeg', answer: ['Sie gehen einkaufen.', 'Einkaufen gehen'] },
+    { image: 'eishockey_spielen.jpeg', answer: ['Sie spielen Eishockey.', 'Eishockey spielen'] },
+    { image: 'santa_sprechen.jpeg', answer: ['Sie sprechen mit dem Weihnachtsmann.', 'Mit dem Weihnachtsmann sprechen'] },
+    { image: 'weihnachtsbaum_heimtragen.jpeg', answer: ['Sie tragen den Weihnachtsbaum nach Hause.', 'Weihnachtsbaum nach Hause tragen'] }
+];
 
 let currentActivityIndex = -1;
 let previousActivityIndex = -1;
 
 // Function to get random activity index (different from previous)
 function getRandomActivityIndex() {
-  const availableIndices = Array.from({ length: activities.length }, (_, i) => i).filter(i => i !== currentActivityIndex);
-  currentActivityIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-  debugger;
-  console.log(`Chosen activity index: ${currentActivityIndex}`); // Log the chosen index
-  return currentActivityIndex;
+    const availableIndices = Array.from({ length: activities.length }, (_, i) => i).filter(i => i !== currentActivityIndex);
+    currentActivityIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+    console.log(`Chosen activity index: ${currentActivityIndex}`); // Log the chosen index
+    return currentActivityIndex;
 }
 
 // Function to start speech recognition
 function startSpeechRecognition() {
-  const micButton = document.getElementById('micButton');
-  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-  recognition.lang = 'de-DE'; // Set language to German
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'de-DE'; // Set to German
+    recognition.start();
 
-  // Add recording class for visual feedback
-  micButton.classList.add('recording');
+    recognition.onstart = function() {
+        console.log("Spracherkennung gestartet...");
+    };
 
-  recognition.onstart = () => {
-    console.log("Spracherkennung gestartet...");
-  };
+    recognition.onresult = function(event) {
+        const spokenAnswer = event.results[0][0].transcript;
+        console.log("Erkannte Antwort:", spokenAnswer);
+        checkAnswer(spokenAnswer);
+    };
 
-  recognition.onresult = (event) => {
-    const userAnswer = event.results[0][0].transcript;
-    checkAnswer(userAnswer); // Process the answer
-    micButton.classList.remove('recording');
-  };
-
-  recognition.onerror = (event) => {
-    console.error("Fehler bei der Spracherkennung:", event.error);
-    micButton.classList.remove('recording');
-  };
-
-  recognition.onend = () => {
-    micButton.classList.remove('recording');
-  };
-
-  recognition.start(); // Start listening
+    recognition.onerror = function(event) {
+        console.error("Fehler bei der Spracherkennung:", event.error);
+    };
 }
 
-// Function for text-to-speech with German voice
-function speak(text) {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'de-DE'; // Set language to German
-  window.speechSynthesis.speak(utterance);
-}
-
-// Function to start the game
-function startGame() {
-  nextImage(); // Show first image
-}
-
-// Function to check the spoken answer
+// Function to check the spoken or typed answer
 function checkAnswer(spokenAnswer) {
-  const currentActivity = activities[currentActivityIndex];
-  const correctAnswers = currentActivity.answer;
-  const feedback = document.getElementById('feedback');
-  
-  const isCorrect = correctAnswers.some(answer => 
-    spokenAnswer.toLowerCase().includes(answer.toLowerCase())
-  );
+    const correctAnswers = activities[currentActivityIndex].answer;
+    const cleanSpokenAnswer = spokenAnswer.replace(/[.?!,;:]/g, '').toLowerCase();
+    const isCorrect = correctAnswers.some(answer => answer.toLowerCase() === cleanSpokenAnswer);
 
-  if (isCorrect) {
-    feedback.textContent = "Richtig! 👏";
-    feedback.style.color = "#27ae60";
-    setTimeout(() => {
-      nextImage();
-    }, 1500);
-  } else {
-    feedback.textContent = "Versuchen Sie es noch einmal! 🤔";
-    feedback.style.color = "#e74c3c";
-  }
+    if (isCorrect) {
+        document.getElementById('feedback').innerText = 'Richtig! Gut gemacht.';
+        speak("Richtig! Gut gemacht.");
+    } else {
+        document.getElementById('feedback').innerText = `Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`;
+        speak(`Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`);
+    }
 }
 
 // Function to change to the next image
 function nextImage() {
-  // Clear previous feedback
-  document.getElementById('feedback').textContent = '';
-  
-  // Get random activity index
-  getRandomActivityIndex();
-  
-  // Update image and speak question
-  const currentActivity = activities[currentActivityIndex];
-  document.getElementById('activityImage').src = currentActivity.image;
-  speak("Was machen diese Leute?");
+    // Clear previous feedback
+    document.getElementById('feedback').innerText = '';
+    
+    // Get random activity index
+    getRandomActivityIndex();
+    
+    // Update image
+    document.getElementById('activityImage').src = activities[currentActivityIndex].image;
+    
+    // Ask the question aloud
+    speak("Was machen diese Leute?");
 }
+
+// Function for text-to-speech with German voice
+function speak(text) {
+    const speech = new SpeechSynthesisUtterance();
+    speech.lang = 'de-DE'; // Set language to German
+    speech.text = text;
+    
+    // Select a German voice explicitly (if available)
+    const voices = window.speechSynthesis.getVoices();
+    const germanVoice = voices.find(voice => voice.lang === 'de-DE');
+    
+    if (germanVoice) {
+        speech.voice = germanVoice;
+    }
+    
+    window.speechSynthesis.speak(speech);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize game
+  nextImage(); // Call this to set the initial image
+});
