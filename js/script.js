@@ -51,8 +51,8 @@ function checkAnswer(spokenAnswer) {
     const isCorrect = correctAnswers.some(answer => answer.toLowerCase() === cleanSpokenAnswer);
 
     if (isCorrect) {
-        document.getElementById('feedback').innerText = 'Richtig! Gut gemacht.';
-        speak("Richtig! Gut gemacht.");
+        document.getElementById('feedback').innerText = `Richtig! ${correctAnswers[0]}`;
+        speak(`Richtig! ${correctAnswers[0]}`);
     } else {
         document.getElementById('feedback').innerText = `Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`;
         speak(`Falsch! Die richtige Antwort ist: ${correctAnswers[0]}`);
