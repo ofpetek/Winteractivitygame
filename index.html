@@ -43,6 +43,9 @@
       margin-top: 10px;
       border-radius: 5px;
     }
+    .voice-selection {
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
@@ -62,6 +65,12 @@
   <!-- Speech recognition option -->
   <button class="button" onclick="startSpeechRecognition()">Antwort sprechen</button>
   <button class="button" onclick="nextImage()">Nächste Aktivität</button>
+
+  <div class="voice-selection">
+    <label for="voiceSelect">Stimme auswählen:</label>
+    <select id="voiceSelect" onchange="speak(document.getElementById('question').textContent)">
+    </select>
+  </div>
 
   <p id="feedback" class="feedback"></p>
 
@@ -160,6 +169,24 @@
 
       window.speechSynthesis.speak(speech);
     }
+
+    // Populate the voice selection dropdown
+    function populateVoiceList() {
+      const voiceSelect = document.getElementById('voiceSelect');
+      const voices = window.speechSynthesis.getVoices();
+
+      voices.forEach((voice) => {
+        if (voice.lang === 'de-DE') { // Filter for German voices
+          const option = document.createElement('option');
+          option.value = voice.name;
+          option.textContent = `${voice.name} (${voice.lang})`;
+          voiceSelect.appendChild(option);
+        }
+      });
+    }
+
+    // Fetch voices when they are loaded
+    window.speechSynthesis.onvoiceschanged = populateVoiceList;
   </script>
 </body>
 </html>
