@@ -47,8 +47,6 @@
       border-radius: 50%;
       background-color: #e74c3c;
       border: none;
-      color: white;
-      font-size: 24px;
       cursor: pointer;
       margin: 20px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
@@ -57,6 +55,21 @@
       align-items: center;
       justify-content: center;
       padding: 0;
+      position: relative;
+    }
+    
+    .mic-button::after {
+      content: '';
+      display: block;
+      width: 24px;
+      height: 24px;
+      background-color: white;
+      border-radius: 3px;
+    }
+    
+    .mic-button.recording::after {
+      width: 20px;
+      height: 20px;
     }
     
     .mic-button:hover {
@@ -107,7 +120,7 @@
   <img id="activityImage" src="" alt="Winteraktivität Bild">
 
   <div class="controls">
-    <button class="mic-button" onclick="startSpeechRecognition()" id="micButton">🎤</button>
+    <button class="mic-button" onclick="startSpeechRecognition()" id="micButton"></button>
     <button class="button" onclick="nextImage()">Nächste Aktivität</button>
   </div>
 
