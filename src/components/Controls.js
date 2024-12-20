@@ -1,10 +1,11 @@
 import React from 'react';
+import { Button } from 'antd';
 
 const Controls = ({ onSpeechRecognition, onNextActivity }) => {
   return (
     <div className="controls">
-      <button className="mic-button" onClick={onSpeechRecognition}></button>
-      <button className="button" onClick={onNextActivity}>Nächste Aktivität</button>
+      <Button className="mic-button" onClick={onSpeechRecognition}></Button>
+      <Button className="button" onClick={onNextActivity}>Nächste Aktivität</Button>
     </div>
   );
 };

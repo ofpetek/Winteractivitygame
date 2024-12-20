@@ -1,7 +1,10 @@
 import React from 'react';
+import { Typography } from 'antd';
+
+const { Paragraph } = Typography;
 
 const Question = ({ text }) => {
-  return <p>{text}</p>;
+  return <Paragraph>{text}</Paragraph>;
 };
 
 export default Question;

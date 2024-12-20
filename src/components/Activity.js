@@ -1,7 +1,8 @@
 import React from 'react';
+import { Image } from 'antd';
 
 const Activity = ({ src }) => {
-  return <img src={src} alt="Winteraktivität Bild" />;
+  return <Image src={src} alt="Winteraktivität Bild" />;
 };
 
 export default Activity;
