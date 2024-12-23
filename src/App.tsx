@@ -30,24 +30,12 @@ function App() {
                             path="/admin/*" 
                             element={<AdminPage />} 
                         />
-                        <Route 
-                            path="/game" 
-                            element={<GamePage />} 
-                        />
                         <Route
                             path="/"
                             element={
                                 !isLoggedIn ? (
                                     <Login onLogin={handleLogin} />
-                                ) : (
-                                    <div>
-                                        <Header />
-                                        <Question />
-                                        <ActivityImage src="" />
-                                        <Controls onNext={() => {}} onMicClick={() => {}} />
-                                        <Feedback />
-                                    </div>
-                                )
+                                ) : (<GamePage /> )
                             }
                         />
                     </Routes>
