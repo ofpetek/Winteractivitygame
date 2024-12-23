@@ -12,19 +12,21 @@ exports.processAudio = functions.https.onRequest(async (req, res) => {
        if (req.method === 'OPTIONS') {
         res.set('Access-Control-Allow-Origin', '*'); // Allow requests from any origin
         res.set('Access-Control-Allow-Methods', 'POST, OPTIONS'); // Allow POST and OPTIONS methods
-        res.set('Access-Control-Allow-Headers', 'Content-Type'); // Allow Content-Type header
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow Content-Type and Authorization headers
         res.end(); // Send a response to the preflight request
         return;
       }
-
-    // Ensure this is a POST request
-    if (req.method !== 'POST') {
-      res.status(405).send('Method Not Allowed');
-      return;
-    }
-    // Allow cors
-    res.set('Access-Control-Allow-Origin', '*');
-
+      
+      // Ensure this is a POST request
+      if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+      }
+      // Allow cors
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow Content-Type and Authorization headers
+      res.set('Access-Control-Allow-Methods', 'POST, OPTIONS'); // Allow POST and OPTIONS methods
+    
     // Validate request body
     const { data } = req.body;
     if (!data || !data.data || !data.mimeType) {

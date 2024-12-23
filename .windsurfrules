@@ -2,3 +2,34 @@
 
 This is a web app for children to learn language through simple practices.
 
+# Goals
+  Main idea is to allow child to login with a secret word. 
+  And then use google gemini AI to ask for questions based on the image on the screen and evaluate childs responses using new voice capabilities.
+  Ideally we will have game levels load from a remote database in firebase.
+
+# Stack
+
+- Package Manager:
+    React app: PNPM
+    functions: NPM
+- Core:
+    React 18 + TypeScript
+    Vite 6 (Build tool)
+- UI Components:
+    Shadcn/ui (Based on Radix UI)
+    TailwindCSS
+    Lucide Icons
+- Backend/Services:
+    Firebase
+    Google's Generative AI
+- Voice Features:
+    Web Speech API
+    React Speech Recognition
+    Custom Voice Settings Context
+- State Management:
+    React Context API
+    React Hooks
+
+## How to add component with shacdn/ui
+
+  `pnpm dlx shadcn@latest add accordion`
