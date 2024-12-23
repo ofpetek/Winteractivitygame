@@ -5,17 +5,15 @@ import { adminService } from '../../lib/firebase/admin-service';
 import type { Image } from '../../lib/schemas';
 
 type ImageUploadProps = {
-  weekId: string;
-  onImagesUploaded: (images: Image[]) => void;
-  existingImages?: Image[];
-  onImageRemove: (fileName: string) => void;
+  value?: Image[];
+  onChange: (images: Image[]) => void;
+  onRemove: (url: string) => void;
 };
 
 export function ImageUpload({
-  weekId,
-  onImagesUploaded,
-  existingImages = [],
-  onImageRemove,
+  value = [],
+  onChange,
+  onRemove,
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
 
@@ -30,11 +28,11 @@ export function ImageUpload({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const practiceId = crypto.randomUUID(); // Temporary ID for new practice
-        const image = await adminService.uploadImage(file, weekId, practiceId);
+        const image = await adminService.uploadImage(file, practiceId);
         uploadedImages.push(image);
       }
 
-      onImagesUploaded(uploadedImages);
+      onChange([...value, ...uploadedImages]);
     } catch (error) {
       console.error('Error uploading images:', error);
     } finally {
@@ -42,27 +40,19 @@ export function ImageUpload({
     }
   };
 
-  const handleRemove = async (fileName: string) => {
-    try {
-      await adminService.deleteImage(fileName);
-      onImageRemove(fileName);
-    } catch (error) {
-      console.error('Error removing image:', error);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {existingImages.map((image) => (
-          <div key={image.fileName} className="relative group">
+        {value.map((image) => (
+          <div key={image.url} className="relative group">
             <img
               src={image.url}
-              alt="Practice"
+              alt={image.alt || "Practice"}
               className="w-full h-32 object-cover rounded-md"
             />
             <button
-              onClick={() => handleRemove(image.fileName)}
+              type="button"
+              onClick={() => onRemove(image.url)}
               className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <X className="h-4 w-4" />

@@ -114,13 +114,21 @@ export const adminService = {
     return practices;
   },
 
-  async updatePractice(practiceId: string, practiceData: Partial<Practice>) {
-    const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
-    const practiceRef = doc(practicesRef, practiceId);
-    await updateDoc(practiceRef, {
-      ...practiceData,
-      updatedAt: serverTimestamp(),
-    });
+  async updatePractice(practiceId: string, data: Partial<Practice>) {
+    try {
+      const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
+      const practiceRef = doc(practicesRef, practiceId);
+      const updateData = {
+        ...data,
+        updatedAt: serverTimestamp(),
+      };
+      
+      await updateDoc(practiceRef, updateData);
+      console.log('Practice updated successfully:', practiceId);
+    } catch (error) {
+      console.error('Error updating practice:', error);
+      throw error;
+    }
   },
 
   async deletePractice(practiceId: string) {
@@ -146,18 +154,21 @@ export const adminService = {
   },
 
   // Images
-  async uploadImage(file: File, weekId: string, practiceId: string): Promise<Image> {
-    const fileName = `${weekId}/${practiceId}/${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, fileName);
-    
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-
-    return {
-      url,
-      fileName,
-      uploadedAt: new Date(),
-    };
+  async uploadImage(file: File, practiceId: string): Promise<Image> {
+    try {
+      const storageRef = ref(storage, `practices/${practiceId}/${file.name}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      return {
+        url,
+        alt: file.name,
+        fileName: file.name
+      };
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
   },
 
   async deleteImage(fileName: string) {

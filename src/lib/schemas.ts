@@ -14,7 +14,7 @@ export const practiceCreateSchema = z.object({
   difficulty: z.enum(["easy", "medium", "hard"]),
   images: z.array(imageSchema).default([]),
   weekId: z.string(),
-  isActive: z.boolean().default(false),
+  isActive: z.boolean().default(true),
 });
 
 // Full practice schema including server-generated fields
