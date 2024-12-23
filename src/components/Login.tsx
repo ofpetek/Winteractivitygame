@@ -4,8 +4,8 @@ import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { app } from '../firebaseConfig';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Mic } from 'lucide-react';
+import { useVoiceSettings } from '../contexts/VoiceSettingsContext';
 
 interface LoginProps {
     onLogin: () => void;
@@ -16,9 +16,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [feedback, setFeedback] = useState('');
     const [transcribedText, setTranscribedText] = useState('');
     const [audioLevel, setAudioLevel] = useState(0);
-    const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-    const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-    const [silenceThreshold, setSilenceThreshold] = useState(-2); // New state for silence threshold
+    const { settings } = useVoiceSettings();
     
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
@@ -26,7 +24,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const listeningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const isListeningRef = useRef(false); // Add this ref to track current listening state
+    const isListeningRef = useRef(false);
 
     // Initialize Firebase function
     const functions = getFunctions(app);
@@ -34,15 +32,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const auth = getAuth(app);
 
     useEffect(() => {
-        // Get audio input devices
-        navigator.mediaDevices.enumerateDevices().then((deviceInfos) => {
-            const audioDevices = deviceInfos.filter(device => device.kind === 'audioinput');
-            setDevices(audioDevices);
-            if (audioDevices.length > 0) {
-                setSelectedDeviceId(audioDevices[0].deviceId);
-            }
-        });
-
         return () => {
             // Cleanup
             if (mediaRecorderRef.current) {
@@ -61,8 +50,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }, []);
 
     useEffect(() => {
-        console.log('Silence threshold set to:', silenceThreshold);
-    }, [silenceThreshold]);
+        console.log('Silence threshold set to:', settings.silenceThreshold);
+    }, [settings.silenceThreshold]);
         
     const startListening = useCallback(async () => {
         const processAudio = async (audioBlob: Blob) => {
@@ -126,7 +115,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             setAudioLevel(rms); // Update audio level state
             console.log('Real-time audio level (RMS):', rms); // Real-time logging
 
-            if (rms < Math.abs(silenceThreshold)) { // Use silenceThreshold state
+            if (rms < Math.abs(settings.silenceThreshold)) { // Use silenceThreshold from settings
                 if (silenceTimeoutRef.current === null) {
                     console.log('Silence detected. Starting silence timeout...');
                     silenceTimeoutRef.current = setTimeout(() => {
@@ -146,7 +135,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         try {
             console.log('Requesting audio stream...');
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined } 
+                audio: { deviceId: settings.deviceId } 
             });
             console.log('Audio stream received:', stream);
             
@@ -198,7 +187,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             console.error('Error accessing microphone:', error);
             setFeedback('Error accessing microphone. Please check permissions.');
         }
-    }, [selectedDeviceId, isListening, audioLevel, silenceThreshold, transcribeAudio, auth, onLogin, setFeedback]);
+    }, [settings.deviceId, isListening, audioLevel, settings.silenceThreshold, transcribeAudio, auth, onLogin, setFeedback]);
 
     const stopListening = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -223,36 +212,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Microphone</label>
-                            <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select a microphone" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {devices.map((device) => (
-                                        <SelectItem key={device.deviceId} value={device.deviceId}>
-                                            {device.label || `Microphone ${device.deviceId}`}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Silence Threshold</label>
-                            <input
-                                type="range"
-                                min="-10"
-                                max="0"
-                                step="1"
-                                value={silenceThreshold}
-                                onChange={(e) => setSilenceThreshold(Number(e.target.value))}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                            />
-                            <div className="text-sm text-gray-500 text-center">{silenceThreshold}</div>
-                        </div>
-
                         <div className="flex flex-col items-center gap-4">
                             <Button
                                 onClick={isListening ? stopListening : startListening}
@@ -265,7 +224,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 <Mic className={`w-8 h-8 ${isListening ? 'animate-pulse' : ''}`} />
                             </Button>
                             <p className="text-sm font-medium text-gray-700">
-                                {isListening ? 'Listening...' : 'Click to Start'}
+                                {isListening ? 'Listening...' : 'Click and say the secret word'}
                             </p>
                         </div>
 
