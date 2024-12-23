@@ -70,15 +70,14 @@ export const adminService = {
   },
 
   // Practices
-  async createPractice(weekId: string, practiceData: Omit<Practice, 'id' | 'createdAt' | 'updatedAt'>) {
+  async createPractice(practiceData: Omit<Practice, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
-      console.log('Creating practice with data:', { weekId, ...practiceData });
+      console.log('Creating practice with data:', practiceData);
       
       // Create a new document reference in the practices collection
       const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
       const docRef = await addDoc(practicesRef, {
         ...practiceData,
-        weekId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

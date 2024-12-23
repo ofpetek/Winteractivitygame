@@ -64,18 +64,10 @@ export function PracticeForm({ weekId, onComplete, onCancel, initialData }: Prac
 
             if (initialData?.id) {
               console.log('Updating practice:', initialData.id, values);
-              await adminService.updatePractice(initialData.id, {
-                title: values.title,
-                description: values.description,
-                difficulty: values.difficulty,
-                images: values.images,
-              });
+              await adminService.updatePractice(initialData.id, values);
             } else {
               console.log('Creating new practice with data:', values);
-              await adminService.createPractice({
-                ...values,
-                weekId: weekId,
-              });
+              await adminService.createPractice(values);
             }
             
             onComplete();
