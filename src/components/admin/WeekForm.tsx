@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { weekCreateSchema, type WeekCreate } from '../../lib/schemas';
+import { weekCreateSchema } from '../../lib/schemas';
 import { adminService } from '../../lib/firebase/admin-service';
 import { Button } from '../ui/button';
 import {
@@ -19,24 +19,23 @@ import { Switch } from '../ui/switch';
 type WeekFormProps = {
   onComplete: () => void;
   onCancel: () => void;
-  initialData?: Partial<WeekCreate>;
+  initialData?: any;
 };
 
 export function WeekForm({ onComplete, onCancel, initialData }: WeekFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<WeekCreate>({
+  const form = useForm({
     resolver: zodResolver(weekCreateSchema),
     defaultValues: {
       weekNumber: initialData?.weekNumber || 1,
       title: initialData?.title || '',
       description: initialData?.description || '',
       isActive: initialData?.isActive || false,
-      practices: [],
     },
   });
 
-  const onSubmit = async (data: WeekCreate) => {
+  const onSubmit = async (data: any) => {
     try {
       setIsSubmitting(true);
       if (initialData?.id) {
@@ -47,7 +46,6 @@ export function WeekForm({ onComplete, onCancel, initialData }: WeekFormProps) {
       onComplete();
     } catch (error) {
       console.error('Error saving week:', error);
-      // Show error in form
       if (error instanceof Error) {
         form.setError('root', { message: error.message });
       }
@@ -66,7 +64,7 @@ export function WeekForm({ onComplete, onCancel, initialData }: WeekFormProps) {
             <FormItem>
               <FormLabel>Week Number</FormLabel>
               <FormControl>
-                <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                <Input type="number" min={1} {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -105,15 +103,17 @@ export function WeekForm({ onComplete, onCancel, initialData }: WeekFormProps) {
           control={form.control}
           name="isActive"
           render={({ field }) => (
-            <FormItem className="flex items-center justify-between">
-              <FormLabel>Active</FormLabel>
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <FormLabel className="text-base">Active Week</FormLabel>
+                <FormMessage />
+              </div>
               <FormControl>
                 <Switch
                   checked={field.value}
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
-              <FormMessage />
             </FormItem>
           )}
         />
