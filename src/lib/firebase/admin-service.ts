@@ -72,7 +72,7 @@ export const adminService = {
     const weekRef = doc(collections.weeks, weekId);
     const week = await getDoc(weekRef);
     if (week.exists()) {
-      const practices = week.data().practices || [];
+      const practices = (week.data().practices || []);
       await updateDoc(weekRef, {
         practices: [...practices, { id: docRef.id, ...practiceData }],
       });

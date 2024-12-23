@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { practiceSchema } from '../../lib/schemas';
+import { practiceCreateSchema, type PracticeCreate } from '../../lib/schemas';
 import { adminService } from '../../lib/firebase/admin-service';
 import { Button } from '../ui/button';
 import {
@@ -28,15 +28,15 @@ type PracticeFormProps = {
   weekId: string;
   onComplete: () => void;
   onCancel: () => void;
-  initialData?: Partial<typeof practiceSchema._type>;
+  initialData?: Partial<PracticeCreate>;
 };
 
 export function PracticeForm({ weekId, onComplete, onCancel, initialData }: PracticeFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<Image[]>(initialData?.images || []);
 
-  const form = useForm({
-    resolver: zodResolver(practiceSchema),
+  const form = useForm<PracticeCreate>({
+    resolver: zodResolver(practiceCreateSchema),
     defaultValues: {
       title: initialData?.title || '',
       description: initialData?.description || '',
@@ -45,7 +45,7 @@ export function PracticeForm({ weekId, onComplete, onCancel, initialData }: Prac
     },
   });
 
-  const onSubmit = async (data: typeof practiceSchema._type) => {
+  const onSubmit = async (data: PracticeCreate) => {
     try {
       setIsSubmitting(true);
       const practiceData = {
@@ -61,6 +61,9 @@ export function PracticeForm({ weekId, onComplete, onCancel, initialData }: Prac
       onComplete();
     } catch (error) {
       console.error('Error saving practice:', error);
+      if (error instanceof Error) {
+        form.setError('root', { message: error.message });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -140,6 +143,10 @@ export function PracticeForm({ weekId, onComplete, onCancel, initialData }: Prac
             onImageRemove={handleImageRemove}
           />
         </div>
+
+        {form.formState.errors.root && (
+          <p className="text-sm text-red-500">{form.formState.errors.root.message}</p>
+        )}
 
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline" onClick={onCancel}>

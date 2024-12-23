@@ -5,14 +5,15 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { PracticeForm } from './PracticeForm';
 import { adminService } from '../../lib/firebase/admin-service';
-import type { Practice } from '../../lib/schemas';
+import type { Practice, Week } from '../../lib/schemas';
 
 export function WeekManager() {
   const { weekId } = useParams();
   const navigate = useNavigate();
   const [practices, setPractices] = useState<Practice[]>([]);
   const [isAddingPractice, setIsAddingPractice] = useState(false);
-  const [weekTitle, setWeekTitle] = useState('');
+  const [weekData, setWeekData] = useState<Week | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (weekId) {
@@ -24,19 +25,22 @@ export function WeekManager() {
     if (!weekId) return;
     
     try {
+      setIsLoading(true);
       const weekDoc = await adminService.getWeek(weekId);
       if (weekDoc) {
-        setWeekTitle(weekDoc.title);
+        setWeekData(weekDoc);
         setPractices(weekDoc.practices || []);
       }
     } catch (error) {
       console.error('Error loading week data:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handlePracticeAdded = () => {
     setIsAddingPractice(false);
-    loadWeekData();
+    loadWeekData(); // Reload week data to get the updated practices
   };
 
   const handleDeletePractice = async (practiceId: string) => {
@@ -56,23 +60,25 @@ export function WeekManager() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex items-center mb-6">
+      <div className="flex flex-wrap items-center gap-4 mb-6">
         <Button
           variant="ghost"
           onClick={() => navigate('/admin')}
-          className="mr-4"
+          className="shrink-0 text-white"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Weeks
         </Button>
-        <h1 className="text-3xl font-bold flex-1">{weekTitle}</h1>
-        <Button onClick={() => setIsAddingPractice(true)}>
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold">{weekData?.title || 'Loading...'}</h1>
+        </div>
+        <Button onClick={() => setIsAddingPractice(true)} className="shrink-0 w-full">
           <Plus className="mr-2 h-4 w-4" />
           Add Practice
         </Button>
       </div>
 
-      {isAddingPractice && (
+      {isAddingPractice && weekId && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Add New Practice</CardTitle>
@@ -121,6 +127,11 @@ export function WeekManager() {
                   +{practice.images.length - 4} more images
                 </p>
               )}
+              <div className="mt-4">
+                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800">
+                  {practice.difficulty}
+                </span>
+              </div>
             </CardContent>
           </Card>
         ))}
