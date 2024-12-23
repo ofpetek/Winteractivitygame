@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { app } from '../firebaseConfig';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Mic } from 'lucide-react';
 
 interface LoginProps {
     onLogin: () => void;
@@ -206,62 +210,83 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
     };
 
-    
-
     return (
-        <div className="login-container">
-            <h2>Welcome to Winter Activity Game</h2>
-            <p>Please speak the secret word to continue</p>
-            
-            <select 
-                value={selectedDeviceId} 
-                onChange={(e) => setSelectedDeviceId(e.target.value)}
-                disabled={isListening}
-            >
-                {devices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                        {device.label || `Microphone ${device.deviceId}`}
-                    </option>
-                ))}
-            </select>
-            
-            <label>
-                Silence Threshold:
-                <input 
-                    type="number" 
-                    value={silenceThreshold} 
-                    onChange={(e) => setSilenceThreshold(Number(e.target.value))} 
-                    disabled={isListening}
-                />
-            </label>
-            
-            <button 
-                className={`mic-button ${isListening ? 'recording' : ''}`}
-                onClick={startListening}
-                disabled={isListening}
-            >
-                {isListening ? 'Listening...' : 'Say the password to login'}
-            </button>
-            
-            {isListening && (
-                <div className="audio-level-indicator">
-                    <p>Audio Level: {audioLevel}</p>
-                    <div 
-                        className="audio-level-bar" 
-                        style={{ width: `${audioLevel}%`, height: '10px', background: 'green' }}
-                    />
-                </div>
-            )}
-            
-            {transcribedText && (
-                <p className="spoken-text">You said: {transcribedText}</p>
-            )}
-            
-            {feedback && (
-                <p className={`feedback ${feedback.includes('successful') ? 'success' : 'error'}`}>
-                    {feedback}
-                </p>
-            )}
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+            <Card className="w-full max-w-md">
+                <CardHeader>
+                    <CardTitle className="text-3xl font-bold text-center text-blue-900">
+                        Welcome to Winter Activity Game
+                    </CardTitle>
+                    <CardDescription className="text-center text-gray-600 mt-2">
+                        Say the password to login and start your adventure!
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Microphone</label>
+                            <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select a microphone" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {devices.map((device) => (
+                                        <SelectItem key={device.deviceId} value={device.deviceId}>
+                                            {device.label || `Microphone ${device.deviceId}`}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Silence Threshold</label>
+                            <input
+                                type="range"
+                                min="-10"
+                                max="0"
+                                step="1"
+                                value={silenceThreshold}
+                                onChange={(e) => setSilenceThreshold(Number(e.target.value))}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <div className="text-sm text-gray-500 text-center">{silenceThreshold}</div>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-4">
+                            <Button
+                                onClick={isListening ? stopListening : startListening}
+                                className={`w-32 h-32 rounded-full transition-all ${
+                                    isListening 
+                                        ? 'bg-red-500 hover:bg-red-600' 
+                                        : 'bg-blue-500 hover:bg-blue-600'
+                                }`}
+                            >
+                                <Mic className={`w-8 h-8 ${isListening ? 'animate-pulse' : ''}`} />
+                            </Button>
+                            <p className="text-sm font-medium text-gray-700">
+                                {isListening ? 'Listening...' : 'Click to Start'}
+                            </p>
+                        </div>
+
+                        {feedback && (
+                            <div className={`text-center p-3 rounded-lg ${
+                                feedback.includes('successful') 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                                {feedback}
+                            </div>
+                        )}
+
+                        {transcribedText && (
+                            <div className="text-center text-sm text-gray-600">
+                                Transcribed: {transcribedText}
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };
