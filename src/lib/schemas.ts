@@ -13,12 +13,12 @@ export const practiceCreateSchema = z.object({
   description: z.string(),
   difficulty: z.enum(["easy", "medium", "hard"]),
   images: z.array(imageSchema).default([]),
+  weekId: z.string(),
 });
 
 // Full practice schema including server-generated fields
 export const practiceSchema = practiceCreateSchema.extend({
   id: z.string(),
-  weekId: z.string(),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
 });

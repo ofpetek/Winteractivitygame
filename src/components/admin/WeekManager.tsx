@@ -17,22 +17,26 @@ export function WeekManager() {
 
   useEffect(() => {
     if (weekId) {
-      loadWeekData();
+      loadData();
     }
   }, [weekId]);
 
-  const loadWeekData = async () => {
+  const loadData = async () => {
     if (!weekId) return;
     
     try {
       setIsLoading(true);
-      const weekDoc = await adminService.getWeek(weekId);
+      const [weekDoc, weekPractices] = await Promise.all([
+        adminService.getWeek(weekId),
+        adminService.getPracticesByWeekId(weekId)
+      ]);
+      
       if (weekDoc) {
         setWeekData(weekDoc);
-        setPractices(weekDoc.practices || []);
+        setPractices(weekPractices);
       }
     } catch (error) {
-      console.error('Error loading week data:', error);
+      console.error('Error loading data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -40,15 +44,15 @@ export function WeekManager() {
 
   const handlePracticeAdded = () => {
     setIsAddingPractice(false);
-    loadWeekData(); // Reload week data to get the updated practices
+    loadData();
   };
 
   const handleDeletePractice = async (practiceId: string) => {
-    if (!weekId || !confirm('Are you sure you want to delete this practice?')) return;
+    if (!confirm('Are you sure you want to delete this practice?')) return;
 
     try {
       await adminService.deletePractice(practiceId);
-      loadWeekData();
+      loadData();
     } catch (error) {
       console.error('Error deleting practice:', error);
     }

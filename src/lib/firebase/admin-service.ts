@@ -1,27 +1,27 @@
-import { 
+import {
+  collection,
   doc,
   addDoc,
+  getDoc,
+  getDocs,
   updateDoc,
   deleteDoc,
-  getDocs,
-  getDoc,
+  serverTimestamp,
   query,
   where,
-  orderBy,
-  serverTimestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebaseConfig';
-import { collections, COLLECTION_NAMES } from './collections';
+import { COLLECTION_NAMES } from './collections';
 import type { Week, Practice, Image } from '../schemas';
 
 export const adminService = {
   // Weeks
   async createWeek(weekData: Omit<Week, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
-      const docRef = await addDoc(collections.weeks, {
+      const weeksRef = collection(db, COLLECTION_NAMES.WEEKS);
+      const docRef = await addDoc(weeksRef, {
         ...weekData,
-        practices: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -32,101 +32,115 @@ export const adminService = {
     }
   },
 
+  async getWeek(weekId: string) {
+    const weeksRef = collection(db, COLLECTION_NAMES.WEEKS);
+    const docRef = doc(weeksRef, weekId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as Week;
+    }
+    return null;
+  },
+
+  async getAllWeeks() {
+    const weeksRef = collection(db, COLLECTION_NAMES.WEEKS);
+    const querySnapshot = await getDocs(weeksRef);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Week[];
+  },
+
   async updateWeek(weekId: string, weekData: Partial<Week>) {
-    const weekRef = doc(collections.weeks, weekId);
-    await updateDoc(weekRef, {
+    const weeksRef = collection(db, COLLECTION_NAMES.WEEKS);
+    const docRef = doc(weeksRef, weekId);
+    await updateDoc(docRef, {
       ...weekData,
       updatedAt: serverTimestamp(),
     });
   },
 
   async deleteWeek(weekId: string) {
-    await deleteDoc(doc(collections.weeks, weekId));
-  },
-
-  async getAllWeeks() {
-    const q = query(collections.weeks, orderBy('weekNumber'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  },
-
-  async getWeek(weekId: string) {
-    const weekRef = doc(collections.weeks, weekId);
-    const weekDoc = await getDoc(weekRef);
-    if (weekDoc.exists()) {
-      return { id: weekDoc.id, ...weekDoc.data() };
+    // First delete all practices associated with this week
+    const practices = await this.getPracticesByWeekId(weekId);
+    for (const practice of practices) {
+      await this.deletePractice(practice.id);
     }
-    return null;
+    
+    // Then delete the week
+    const weeksRef = collection(db, COLLECTION_NAMES.WEEKS);
+    await deleteDoc(doc(weeksRef, weekId));
   },
 
   // Practices
   async createPractice(weekId: string, practiceData: Omit<Practice, 'id' | 'createdAt' | 'updatedAt'>) {
-    const docRef = await addDoc(collections.practices, {
-      ...practiceData,
-      weekId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    // Update week's practices array
-    const weekRef = doc(collections.weeks, weekId);
-    const week = await getDoc(weekRef);
-    if (week.exists()) {
-      const practices = (week.data().practices || []);
-      await updateDoc(weekRef, {
-        practices: [...practices, { id: docRef.id, ...practiceData }],
+    try {
+      console.log('Creating practice with data:', { weekId, ...practiceData });
+      
+      // Create a new document reference in the practices collection
+      const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
+      const docRef = await addDoc(practicesRef, {
+        ...practiceData,
+        weekId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
+      
+      // Get the created practice to verify
+      const createdPractice = await getDoc(docRef);
+      console.log('Created practice:', { id: docRef.id, ...createdPractice.data() });
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating practice:', error);
+      throw error;
     }
+  },
 
-    return docRef.id;
+  async getPractice(practiceId: string) {
+    const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
+    const docRef = doc(practicesRef, practiceId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as Practice;
+    }
+    return null;
+  },
+
+  async getPracticesByWeekId(weekId: string) {
+    console.log('Getting practices for weekId:', weekId);
+    const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
+    const q = query(practicesRef, where('weekId', '==', weekId));
+    const querySnapshot = await getDocs(q);
+    const practices = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Practice[];
+    console.log('Found practices:', practices);
+    return practices;
   },
 
   async updatePractice(practiceId: string, practiceData: Partial<Practice>) {
-    const practiceRef = doc(collections.practices, practiceId);
+    const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
+    const practiceRef = doc(practicesRef, practiceId);
     await updateDoc(practiceRef, {
       ...practiceData,
       updatedAt: serverTimestamp(),
     });
-
-    // Update practice in week's practices array
-    const practice = await getDoc(practiceRef);
-    if (practice.exists()) {
-      const weekId = practice.data().weekId;
-      const weekRef = doc(collections.weeks, weekId);
-      const week = await getDoc(weekRef);
-      if (week.exists()) {
-        const practices = week.data().practices || [];
-        const updatedPractices = practices.map((p: Practice) =>
-          p.id === practiceId ? { ...p, ...practiceData } : p
-        );
-        await updateDoc(weekRef, { practices: updatedPractices });
-      }
-    }
   },
 
   async deletePractice(practiceId: string) {
-    const practiceRef = doc(collections.practices, practiceId);
+    const practicesRef = collection(db, COLLECTION_NAMES.PRACTICES);
+    const practiceRef = doc(practicesRef, practiceId);
     const practice = await getDoc(practiceRef);
     
     if (practice.exists()) {
-      const weekId = practice.data().weekId;
-      
-      // Delete practice document
-      await deleteDoc(practiceRef);
+      try {
+        // Delete practice document
+        await deleteDoc(practiceRef);
 
-      // Remove practice from week's practices array
-      const weekRef = doc(collections.weeks, weekId);
-      const week = await getDoc(weekRef);
-      if (week.exists()) {
-        const practices = week.data().practices || [];
-        const updatedPractices = practices.filter((p: Practice) => p.id !== practiceId);
-        await updateDoc(weekRef, { practices: updatedPractices });
-      }
-
-      // Delete associated images
-      const images = practice.data().images || [];
-      for (const image of images) {
-        await this.deleteImage(image.fileName);
+        // Delete associated images
+        const images = practice.data().images || [];
+        for (const image of images) {
+          await this.deleteImage(image.fileName);
+        }
+      } catch (error) {
+        console.error('Error deleting practice:', error);
+        throw error;
       }
     }
   },
@@ -147,7 +161,12 @@ export const adminService = {
   },
 
   async deleteImage(fileName: string) {
-    const storageRef = ref(storage, fileName);
-    await deleteObject(storageRef);
+    try {
+      const imageRef = ref(storage, fileName);
+      await deleteObject(imageRef);
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      throw error;
+    }
   },
 };

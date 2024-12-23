@@ -35,8 +35,8 @@ export function PracticeForm({ weekId, onComplete, onCancel, initialData }: Prac
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<Image[]>(initialData?.images || []);
 
-  const form = useForm<PracticeCreate>({
-    resolver: zodResolver(practiceCreateSchema),
+  const form = useForm<Omit<PracticeCreate, 'weekId'>>({
+    resolver: zodResolver(practiceCreateSchema.omit({ weekId: true })),
     defaultValues: {
       title: initialData?.title || '',
       description: initialData?.description || '',
@@ -45,11 +45,15 @@ export function PracticeForm({ weekId, onComplete, onCancel, initialData }: Prac
     },
   });
 
-  const onSubmit = async (data: PracticeCreate) => {
+  const onSubmit = async (data: Omit<PracticeCreate, 'weekId'>) => {
     try {
       setIsSubmitting(true);
+      console.log('Submitting practice with data:', { ...data, weekId });
+      
+      // Create the complete practice data
       const practiceData = {
         ...data,
+        weekId,
         images: uploadedImages,
       };
 

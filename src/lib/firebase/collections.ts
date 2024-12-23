@@ -76,14 +76,15 @@ function createCollection<T, U = T>(
     .withConverter(createConverter<T, U>(readSchema, writeSchema)) as CollectionReference<T>;
 }
 
-// Create typed collections
-export const collections = {
-  weeks: createCollection<Week>('weeks', weekSchema, weekCreateSchema),
-  practices: createCollection<Practice>('practices', practiceSchema, practiceCreateSchema),
-};
-
 // Collection path constants
 export const COLLECTION_NAMES = {
   WEEKS: 'weeks',
   PRACTICES: 'practices',
 } as const;
+
+
+// Create typed collections
+export const collections = {
+  weeks: createCollection<Week>(COLLECTION_NAMES.WEEKS, weekSchema, weekCreateSchema),
+  practices: createCollection<Practice>(COLLECTION_NAMES.PRACTICES, practiceSchema, practiceCreateSchema),
+};
