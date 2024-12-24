@@ -72,7 +72,7 @@ export type ActOut = z.infer<typeof ActOut>;
 export type CountObjects = z.infer<typeof CountObjects>;
 
 // Utility function to convert Zod schema to GoogleGenerativeAI schema
-export function zodToGenerativeSchema(schema: z.ZodType): any {
+export function zodToGenerativeSchema(schema: z.ZodType): Record<string, unknown> {
   if (schema instanceof z.ZodString) {
     return { type: SchemaType.STRING };
   }
@@ -94,10 +94,13 @@ export function zodToGenerativeSchema(schema: z.ZodType): any {
   
   if (schema instanceof z.ZodObject) {
     const shape = schema._def.shape();
-    const properties: Record<string, any> = {};
+    const properties: Record<string, unknown> = {};
     
     for (const [key, value] of Object.entries(shape)) {
-      properties[key] = zodToGenerativeSchema(value);
+      if (value instanceof z.ZodOptional || value instanceof z.ZodNullable) {
+        properties[key] = zodToGenerativeSchema(value.unwrap());
+        continue;
+      }
     }
     
     return {
@@ -117,8 +120,8 @@ export function zodToGenerativeSchema(schema: z.ZodType): any {
     // For union types, we'll create an enum from literal types if possible
     const options = schema._def.options;
     const literals = options
-      .filter((opt: any) => opt instanceof z.ZodLiteral)
-      .map((opt: any) => opt._def.value);
+      .filter((opt: unknown) => opt instanceof z.ZodLiteral)
+      .map((opt: z.ZodLiteral<string>) => opt._def.value);
       
     if (literals.length === options.length) {
       return {
@@ -136,7 +139,7 @@ export function zodToGenerativeSchema(schema: z.ZodType): any {
     return {
       ...innerSchema,
       nullable: true,
-    };
+    } as Record<string, unknown>;
   }
   
   if (schema instanceof z.ZodLiteral) {

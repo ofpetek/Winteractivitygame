@@ -2,114 +2,15 @@ import {
   GoogleGenerativeAI,
   SchemaType,
 } from "@google/generative-ai";
+import fetch from 'node-fetch';
 
 import * as functions from 'firebase-functions';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import { Presentation } from '../../presentations.ts';
+import { presentationResponseSchema, Question } from '../../presentations';
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || '');
 
-async function generateQuestionsFromImage(imageUrl: string, description: string): Promise<Question[]> {
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.0-flash-exp',
-    generationConfig: {
-      temperature: 0.7,
-      topP: 0.8,
-      topK: 40,
-      maxOutputTokens: 8192,
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          questions: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                text: { type: SchemaType.STRING },
-                answer: { type: SchemaType.STRING },
-                presentation: {
-                  type: SchemaType.OBJECT,
-                  properties: {
-                    type: {
-                      type: SchemaType.STRING,
-                      enum: [
-                        'point_on_image',
-                        'speak_word',
-                        'choose_from_options',
-                        'make_sound',
-                        'act_out',
-                        'count_objects'
-                      ]
-                    },
-                    // For point_on_image and count_objects
-                    coordinates: {
-                      type: SchemaType.OBJECT,
-                      nullable: true,
-                      properties: {
-                        x: { type: SchemaType.NUMBER },
-                        y: { type: SchemaType.NUMBER },
-                        width: { type: SchemaType.NUMBER },
-                        height: { type: SchemaType.NUMBER }
-                      }
-                    },
-                    // For count_objects
-                    locations: {
-                      type: SchemaType.ARRAY,
-                      nullable: true,
-                      items: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                          x: { type: SchemaType.NUMBER },
-                          y: { type: SchemaType.NUMBER },
-                          width: { type: SchemaType.NUMBER },
-                          height: { type: SchemaType.NUMBER }
-                        }
-                      }
-                    },
-                    // For choose_from_options
-                    options: {
-                      type: SchemaType.ARRAY,
-                      nullable: true,
-                      items: { type: SchemaType.STRING }
-                    },
-                    // For speak_word
-                    expectedPronunciation: {
-                      type: SchemaType.STRING,
-                      nullable: true,
-                    },
-                    phonetics: {
-                      type: SchemaType.STRING,
-                      nullable: true,
-                    },
-                    // For make_sound
-                    soundType: {
-                      type: SchemaType.STRING,
-                      nullable: true,
-                      enum: ['animal', 'object', 'nature']
-                    },
-                    example: {
-                      type: SchemaType.STRING,
-                      nullable: true,
-                    },
-                    // For act_out
-                    action: {
-                      type: SchemaType.STRING,
-                      nullable: true,
-                    },
-                    duration: {
-                      type: SchemaType.NUMBER,
-                      nullable: true,
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-
+async function generateQuestionsFromImage(imageData: { data: string, mimeType: string }, description: string): Promise<Question[]> {
   const prompt = `
     Analyze this image and create interactive questions for children based on the following description:
     "${description}"
@@ -125,23 +26,37 @@ async function generateQuestionsFromImage(imageUrl: string, description: string)
     5. Vary the types of interactions to keep children engaged
   `;
 
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.0-flash-exp',
+    generationConfig: {
+      temperature: 0.7,
+      topP: 0.8,
+      topK: 40,
+      maxOutputTokens: 8192,
+      responseSchema: presentationResponseSchema
+    },
+    systemInstruction: prompt
+  });
+
   try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: imageUrl } }]}],
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 8192,
+    const result = await model.generateContent([
+          { 
+            inlineData: { 
+              mimeType: imageData.mimeType, 
+              data: imageData.data 
+            } 
       },
-    });
+      { text: 'generate questions for this image' }, 
+      ],);
     
     const response = await result.response;
     const text = response.text();
     
     // Parse the JSON response
+    console.log('Generated questions:', text);
     const data = JSON.parse(text);
-    return data.questions;
+    console.log('Parsed questions:', data);
+    return data;
   } catch (error) {
     console.error('Error generating questions:', error);
     throw error;
@@ -158,8 +73,13 @@ export const onPracticeCreated = onDocumentCreated('practices/{practiceId}', asy
 
   try {
     // Generate questions for each image
+    const imageResponse = await fetch(practice.images[0].url);
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(arrayBuffer).toString('base64');
+    const imageData = { data: base64Image, mimeType: 'image/png' };
+
     const questions = await generateQuestionsFromImage(
-      practice.images[0].url,
+      imageData,
       practice.description
     );
 
@@ -191,8 +111,13 @@ export const onPracticeUpdated = onDocumentUpdated('practices/{practiceId}', asy
 
   try {
     // Generate new questions
+    const imageResponse = await fetch(afterData.images[0].url);
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(arrayBuffer).toString('base64');
+    const imageData = { data: base64Image, mimeType: 'image/png' };
+
     const questions = await generateQuestionsFromImage(
-      afterData.images[0].url,
+      imageData,
       afterData.description
     );
 
