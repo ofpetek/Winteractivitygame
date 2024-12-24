@@ -1,0 +1,129 @@
+{
+  "type": "object",
+  "properties": {
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "presentation": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "point_on_image",
+                  "speak_word",
+                  "choose_from_options",
+                  "make_sound",
+                  "act_out",
+                  "count_objects"
+                ]
+              },
+              "coordinates": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number"
+                  },
+                  "height": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "description": "Coordinates for pointing or marking areas in image"
+              },
+              "expectedPronunciation": {
+                "type": "string"
+              },
+              "phonetics": {
+                "type": "string"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "soundType": {
+                "type": "string",
+                "enum": [
+                  "animal",
+                  "object",
+                  "nature"
+                ]
+              },
+              "example": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "number"
+              },
+              "locations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "width": {
+                      "type": "number"
+                    },
+                    "height": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "description": "Coordinates for pointing or marking areas in image"
+                }
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "description": "Presentation configuration"
+          }
+        },
+        "required": [
+          "text",
+          "answer",
+          "presentation"
+        ],
+        "description": "Question with presentation"
+      }
+    }
+  },
+  "required": [
+    "questions"
+  ],
+  "description": "Question response schema"
+}

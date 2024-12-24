@@ -2,7 +2,6 @@ import {
   GoogleGenerativeAI,
   SchemaType,
 } from "@google/generative-ai";
-import fetch from 'node-fetch';
 
 import * as functions from 'firebase-functions';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -15,15 +14,13 @@ async function generateQuestionsFromImage(imageData: { data: string, mimeType: s
     Analyze this image and create interactive questions for children based on the following description:
     "${description}"
     
-    Generate questions that are engaging and educational. Each question should have a specific presentation type.
-    Return the response in JSON format following this schema:
+    Generate questions that are engaging and educational.
     
     Make sure to:
-    1. Use presentation types appropriately for the content
-    2. Include all required fields for each presentation type
-    3. Make questions age-appropriate and engaging
-    4. Focus on elements clearly visible in the image
-    5. Vary the types of interactions to keep children engaged
+    1. Create age-appropriate and engaging questions
+    2. Focus on elements clearly visible in the image
+    3. Vary the types of interactions to keep children engaged
+    4. Use appropriate presentation types for each question
   `;
 
   const model = genAI.getGenerativeModel({ 
@@ -33,18 +30,22 @@ async function generateQuestionsFromImage(imageData: { data: string, mimeType: s
       topP: 0.8,
       topK: 40,
       maxOutputTokens: 8192,
+      responseMimeType: "application/json",
       responseSchema: presentationResponseSchema
     },
     systemInstruction: prompt
   });
 
   try {
+    console.log('imageData', imageData.data.slice(0, 500));
+    console.log('imageMymeType', imageData.mimeType);
+    
     const result = await model.generateContent([
-          { 
-            inlineData: { 
-              mimeType: imageData.mimeType, 
-              data: imageData.data 
-            } 
+      { 
+        inlineData: { 
+          mimeType: imageData.mimeType, 
+          data: imageData.data 
+        } 
       },
       { text: 'generate questions for this image' }, 
       ],);
@@ -78,7 +79,9 @@ export const onPracticeCreated = onDocumentCreated('practices/{practiceId}', asy
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
     const imageData = { data: base64Image, mimeType: 'image/png' };
 
-    const questions = await generateQuestionsFromImage(
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    const { questions } = await generateQuestionsFromImage(
       imageData,
       practice.description
     );
