@@ -33,3 +33,11 @@ This is a web app for children to learn language through simple practices.
 ## How to add component with shacdn/ui
 
   `pnpm dlx shadcn@latest add accordion`
+
+# Roadmap
+  - [x] Add voice settings dialog
+  - [x] Add voice recognition
+  - [x] Create login page using passphrase
+  - [x] Add admin page with weeks and practices
+  - [x] Add preactice levels to database
+  - [ ] Implement practice running presets
