@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVoiceSettings } from '../contexts/VoiceSettingsContext';
+import { useVoiceLevel } from '../contexts/VoiceLevelContext';
 
 interface UseSpeechInteractionProps {
   text: string;
@@ -11,10 +12,12 @@ export function useSpeechInteraction({
   text, 
   onRecognizedSpeech,
   autoStart = true 
-}: UseSpeechInteractionProps) {
+}: UseSpeechInteractionProps)
+{
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const { settings } = useVoiceSettings();
+  const { setAudioLevel } = useVoiceLevel();
   const hasSpoken = useRef(false);
 
   // Audio recording refs
@@ -82,6 +85,14 @@ export function useSpeechInteraction({
     }
     const rms = Math.sqrt(sumSquares / bufferLength);
     
+    // Update global audio level (normalized between 0 and 1)
+    const baseLevel = rms / 128;
+    // If it's near silence, keep it very low
+      // For normal speech, center around 0.3-0.7
+      // Use exponential curve to make middle values more common
+      const normalizedLevel = 0.1 + (Math.pow(baseLevel, 0.3) * 3);
+      setAudioLevel(Math.min(normalizedLevel, 0.9));
+
     // Log audio level every 500ms to avoid console spam
     if (Date.now() % 500 < 50) {
       console.log('🎤 Audio level (RMS):', rms.toFixed(2), 'Threshold:', settings.silenceThreshold);
@@ -198,9 +209,9 @@ export function useSpeechInteraction({
   return {
     speak,
     isSpeaking,
+    isListening,
     startListening,
     stopListening,
-    isListening,
     hasSpoken: hasSpoken.current
   };
 }

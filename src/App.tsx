@@ -8,6 +8,7 @@ import ActivityImage from './ActivityImage';
 import Controls from './Controls';
 import Feedback from './Feedback';
 import { VoiceSettingsProvider } from './contexts/VoiceSettingsContext';
+import { VoiceLevelProvider } from './contexts/VoiceLevelContext';
 import { VoiceSettingsDialog } from './components/VoiceSettingsDialog';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AdminPage } from './components/admin/AdminPage';
@@ -46,19 +47,21 @@ function App() {
 
     return (
         <VoiceSettingsProvider>
-            <Router>
-                <div className="app">
-                    <VoiceSettingsDialog />
-                    <Routes>
-                        <Route path="/" element={isLoggedIn ? <GamePage /> : <Login onLogin={handleLogin} />} />
-                        <Route path="/admin" element={<AdminPage />} />
-                        <Route path="/admin/weeks" element={<WeekManager />} />
-                        <Route path="/practice/:practiceId" element={<PracticePage />} />
-                        <Route path="/admin/week/:weekId" element={<WeekManager />} />
-                    </Routes>
+            <VoiceLevelProvider>
+                <Router>
+                    <div className="app">
+                        <VoiceSettingsDialog />
+                        <Routes>
+                            <Route path="/" element={isLoggedIn ? <GamePage /> : <Login onLogin={handleLogin} />} />
+                            <Route path="/admin" element={<AdminPage />} />
+                            <Route path="/admin/weeks" element={<WeekManager />} />
+                            <Route path="/practice/:practiceId" element={<PracticePage />} />
+                            <Route path="/admin/week/:weekId" element={<WeekManager />} />
+                        </Routes>
 
-                </div>
-            </Router>
+                    </div>
+                </Router>
+            </VoiceLevelProvider>
         </VoiceSettingsProvider>
     );
 }
