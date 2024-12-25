@@ -28,16 +28,42 @@ export function PointOnImage({
     show: false
   });
 
-  const handleRecognizedSpeech = useCallback((text: string) => {
+  const handleRecognizedSpeech = useCallback((text: string, audioBlob?: Blob) => {
+    console.log('🎯 handleRecognizedSpeech called');
+    console.log('📝 Recognized text:', text);
+    
+    if (audioBlob) {
+      console.log('🎵 Received audio blob:', {
+        size: audioBlob.size,
+        type: audioBlob.type
+      });
+      
+      // Create an audio URL for testing
+      const audioUrl = URL.createObjectURL(audioBlob);
+      console.log('🔊 Created audio URL:', audioUrl);
+      
+      // Create an audio element for testing
+      const audio = new Audio(audioUrl);
+      console.log('🎧 Created audio element. To test, run in console:', 'audio.play()');
+      
+      // Keep the audio element in window for testing
+      (window as any).testAudio = audio;
+      console.log('💡 Tip: Use window.testAudio.play() in console to test the recording');
+    } else {
+      console.log('⚠️ No audio blob received');
+    }
+
     if (text.toLowerCase().includes(question.answer.toLowerCase())) {
+      console.log('✅ Correct answer!');
       onAnswer(true);
     } else {
+      console.log('❌ Incorrect answer');
       onAnswer(false);
     }
   }, [question.answer, onAnswer]);
 
   // Speech interaction setup
-  const { isSpeaking, isListening, speak } = useSpeechInteraction({
+  const { isSpeaking, isListening, speak, startListening, stopListening } = useSpeechInteraction({
     text: question.text,
     onRecognizedSpeech: handleRecognizedSpeech,
     autoStart: false
@@ -52,6 +78,21 @@ export function PointOnImage({
     setStarted(true);
     speak();
   }, [speak]);
+
+  // Start listening when speech ends
+  useEffect(() => {
+    if (started && !isSpeaking) {
+      console.log('🎤 Speech ended, starting to listen...');
+      startListening();
+    }
+  }, [started, isSpeaking, startListening]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
+  }, [stopListening]);
 
   const updateSpotlightPosition = useCallback(() => {
     if (!imageRef.current || !question.presentation.coordinates) return;

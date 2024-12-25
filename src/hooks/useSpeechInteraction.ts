@@ -1,9 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVoiceSettings } from '../contexts/VoiceSettingsContext';
-import { SpeechManager } from '../services/SpeechManager';
-import { AudioRecordingManager, AudioRecordingOptions } from '../services/AudioRecordingManager';
-import { SilenceDetector } from '../utils/SilenceDetector';
-import { AudioTranscriptionService } from '../services/AudioTranscriptionService';
 
 interface UseSpeechInteractionProps {
   text: string;
@@ -11,177 +7,200 @@ interface UseSpeechInteractionProps {
   autoStart?: boolean;
 }
 
-interface SpeechState {
-  isSpeaking: boolean;
-  isListening: boolean;
-  error: Error | null;
-}
-
-type SpeechAction = 
-  | { type: 'START_SPEAKING' }
-  | { type: 'STOP_SPEAKING' }
-  | { type: 'START_LISTENING' }
-  | { type: 'STOP_LISTENING' }
-  | { type: 'SET_ERROR'; error: Error };
-
 export function useSpeechInteraction({ 
   text, 
   onRecognizedSpeech,
   autoStart = true 
 }: UseSpeechInteractionProps) {
-  const [state, setState] = useState<SpeechState>({
-    isSpeaking: false,
-    isListening: false,
-    error: null
-  });
-
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const { settings } = useVoiceSettings();
-  const hasInitialized = useRef(false);
-  const currentTextRef = useRef(text);
-  const isUnmountedRef = useRef(false);
-  
-  // Initialize services
-  const speechManager = SpeechManager.getInstance();
-  const recordingManager = new AudioRecordingManager();
-  const transcriptionService = AudioTranscriptionService.getInstance();
-  const silenceDetector = new SilenceDetector({
-    threshold: settings.silenceThreshold,
-    silenceDuration: 2000,
-    onSilenceThresholdReached: () => {
-      if (!isUnmountedRef.current) {
-        recordingManager.stopRecording();
-        dispatch({ type: 'STOP_LISTENING' });
-      }
-    }
-  });
+  const hasSpoken = useRef(false);
 
-  // State management
-  const dispatch = useCallback((action: SpeechAction) => {
-    if (!isUnmountedRef.current) {
-      setState(prevState => {
-        switch (action.type) {
-          case 'START_SPEAKING':
-            return { ...prevState, isSpeaking: true, error: null };
-          case 'STOP_SPEAKING':
-            return { ...prevState, isSpeaking: false };
-          case 'START_LISTENING':
-            return { ...prevState, isListening: true, error: null };
-          case 'STOP_LISTENING':
-            return { ...prevState, isListening: false };
-          case 'SET_ERROR':
-            return { ...prevState, error: action.error, isSpeaking: false, isListening: false };
-          default:
-            return prevState;
-        }
-      });
+  // Audio recording refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const isListeningRef = useRef(false);
+
+  // Cleanup function
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  const processAudio = async (audioBlob: Blob) => {
+    try {
+      console.log('Processing audio...');
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(',')[1];
+        console.log('Audio data:', {
+          mimeType: 'audio/wav',
+          data: base64Audio
+        });
+      };
+      reader.readAsDataURL(audioBlob);
+    } catch (error) {
+      console.error('Error processing audio:', error);
+    }
+  };
+
+  const stopListening = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      console.log('⏹️ Stopping recording...');
+      mediaRecorderRef.current.stop();
+      setIsListening(false);
+      isListeningRef.current = false;
+      console.log('✅ Recording stopped');
+    } else {
+      console.log('ℹ️ No active recording to stop');
     }
   }, []);
 
-  // Handle transcription result
-  const handleTranscriptionResult = useCallback(async (audioBlob: Blob) => {
-    if (!isUnmountedRef.current) {
-      try {
-        const transcribedText = await transcriptionService.transcribe(audioBlob);
-        onRecognizedSpeech(transcribedText);
-      } catch (error) {
-        dispatch({ type: 'SET_ERROR', error: error as Error });
+  const detectSilence = useCallback((analyser: AnalyserNode) => {
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(dataArray);
+
+    // Calculate RMS value
+    let sumSquares = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const value = dataArray[i] - 128;
+      sumSquares += value * value;
+    }
+    const rms = Math.sqrt(sumSquares / bufferLength);
+    
+    // Log audio level every 500ms to avoid console spam
+    if (Date.now() % 500 < 50) {
+      console.log('🎤 Audio level (RMS):', rms.toFixed(2), 'Threshold:', settings.silenceThreshold);
+    }
+
+    if (rms < Math.abs(settings.silenceThreshold)) {
+      if (silenceTimeoutRef.current === null) {
+        console.log('🔇 Silence detected! Level:', rms.toFixed(2), 'below threshold:', settings.silenceThreshold);
+        silenceTimeoutRef.current = setTimeout(() => {
+          console.log('⏱️ Silence timeout reached. Stopping recording...');
+          stopListening();
+        }, 3000);
+      }
+    } else {
+      if (silenceTimeoutRef.current) {
+        console.log('🔊 Sound detected! Level:', rms.toFixed(2), 'above threshold:', settings.silenceThreshold);
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
       }
     }
-  }, [onRecognizedSpeech, dispatch]);
+  }, [settings.silenceThreshold, stopListening]);
 
-  // Start listening for audio
   const startListening = useCallback(async () => {
-    if (isUnmountedRef.current) return;
-
-    try {
-      const recordingOptions: AudioRecordingOptions = {
-        deviceId: settings.deviceId,
-        onStart: () => dispatch({ type: 'START_LISTENING' }),
-        onStop: () => dispatch({ type: 'STOP_LISTENING' }),
-        onDataAvailable: (blob) => {
-          if (blob.size > 0) {
-            handleTranscriptionResult(blob);
-          }
-        },
-        onError: (error) => dispatch({ type: 'SET_ERROR', error })
-      };
-
-      await recordingManager.startRecording(recordingOptions);
-
-      if (recordingManager.isRecording()) {
+    if (!isListening) {
+      try {
+        console.log('🎯 Starting audio recording...');
+        console.log('🎤 Requesting microphone access...');
         const stream = await navigator.mediaDevices.getUserMedia({ 
           audio: { deviceId: settings.deviceId } 
         });
-        await silenceDetector.start(stream);
+        console.log('✅ Microphone access granted');
+        
+        // Set up audio context and analyser
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyserRef.current);
+        console.log('🔧 Audio context and analyser set up');
+        
+        // Configure analyser
+        analyserRef.current.fftSize = 2048;
+        analyserRef.current.minDecibels = -90;
+        analyserRef.current.maxDecibels = -10;
+        analyserRef.current.smoothingTimeConstant = 0.85;
+        console.log('⚙️ Analyser configured:', {
+          fftSize: analyserRef.current.fftSize,
+          minDecibels: analyserRef.current.minDecibels,
+          maxDecibels: analyserRef.current.maxDecibels
+        });
+
+        // Set up media recorder
+        mediaRecorderRef.current = new MediaRecorder(stream);
+        audioChunksRef.current = [];
+
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          console.log('📼 Audio chunk received:', event.data.size, 'bytes');
+          audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorderRef.current.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+          console.log('💾 Recording completed. Audio size:', audioBlob.size, 'bytes');
+          await processAudio(audioBlob);
+        };
+
+        // Start recording
+        mediaRecorderRef.current.start(1000); // Collect data every second
+        setIsListening(true);
+        isListeningRef.current = true;
+        console.log('▶️ Recording started');
+
+        // Start silence detection
+        const checkSilence = () => {
+          if (analyserRef.current && isListeningRef.current) {
+            detectSilence(analyserRef.current);
+            requestAnimationFrame(checkSilence);
+          }
+        };
+        console.log('👂 Starting silence detection');
+        requestAnimationFrame(checkSilence);
+
+      } catch (error) {
+        console.error('❌ Error during recording:', error);
       }
-    } catch (error) {
-      dispatch({ type: 'SET_ERROR', error: error as Error });
+    } else {
+      console.log('⚠️ Already listening, ignoring start request');
     }
-  }, [settings.deviceId, handleTranscriptionResult, dispatch]);
+  }, [isListening, settings.deviceId, detectSilence]);
 
-  // Speak the text
-  const speak = useCallback(async () => {
-    if (state.isSpeaking || isUnmountedRef.current) {
-      return;
+  const speak = useCallback(() => {
+    if (!isSpeaking && text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = settings.language || 'en-US';
+      utterance.rate = settings.rate || 1;
+      utterance.pitch = settings.pitch || 1;
+      utterance.volume = settings.volume || 1;
+
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        hasSpoken.current = true;
+      };
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        if (autoStart) {
+          startListening();
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
     }
-
-    try {
-      dispatch({ type: 'START_SPEAKING' });
-      await speechManager.speak(text);
-      
-      if (!isUnmountedRef.current) {
-        dispatch({ type: 'STOP_SPEAKING' });
-        await startListening();
-      }
-    } catch (error) {
-      if (!isUnmountedRef.current) {
-        dispatch({ type: 'SET_ERROR', error: error as Error });
-      }
-    }
-  }, [text, startListening, dispatch, state.isSpeaking]);
-
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    if (!isUnmountedRef.current) {
-      silenceDetector.stop();
-      recordingManager.cleanup();
-      speechManager.cancel();
-      
-      dispatch({ type: 'STOP_SPEAKING' });
-      dispatch({ type: 'STOP_LISTENING' });
-    }
-  }, [dispatch]);
-
-  // Handle initialization
-  useEffect(() => {
-    // Skip if already initialized or text hasn't changed
-    if (hasInitialized.current && text === currentTextRef.current) {
-      return;
-    }
-
-    // Update current text
-    currentTextRef.current = text;
-
-    if (autoStart) {
-      hasInitialized.current = true;
-      speak();
-    }
-  }, [text, autoStart, speak]);
-
-  // Handle cleanup on unmount only
-  useEffect(() => {
-    isUnmountedRef.current = false;
-    
-    return () => {
-      isUnmountedRef.current = true;
-      cleanup();
-    };
-  }, []); // Empty dependency array means this only runs on mount/unmount
+  }, [text, settings, isSpeaking, autoStart, startListening]);
 
   return {
-    ...state,
     speak,
-    cleanup,
-    startListening
+    isSpeaking,
+    startListening,
+    stopListening,
+    isListening,
+    hasSpoken: hasSpoken.current
   };
 }
