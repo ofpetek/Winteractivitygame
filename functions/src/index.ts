@@ -142,7 +142,7 @@ export const onPracticeUpdated = onDocumentUpdated('practices/{practiceId}', asy
 exports.processAudio = functions.https.onRequest(async (req, res) => {
   try {
        // Handle OPTIONS request
-       if (req.method === 'OPTIONS') {
+     if (req.method === 'OPTIONS') {
         res.set('Access-Control-Allow-Origin', '*'); // Allow requests from any origin
         res.set('Access-Control-Allow-Methods', 'POST, OPTIONS'); // Allow POST and OPTIONS methods
         res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow Content-Type and Authorization headers

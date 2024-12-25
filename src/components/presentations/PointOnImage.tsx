@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Question } from '../../../presentations';
 import Spotlight from 'react-spotlight';
 import { useSpeechInteraction } from '../../hooks/useSpeechInteraction';
+import { Button } from '@/components/ui/button';
+import { Play } from 'lucide-react';
 
 interface PointOnImageProps {
   question: Question;
@@ -18,6 +20,7 @@ export function PointOnImage({
 }: PointOnImageProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [started, setStarted] = useState(false);
   const [spotlightConfig, setSpotlightConfig] = useState({
     x: 0,
     y: 0,
@@ -25,17 +28,19 @@ export function PointOnImage({
     show: false
   });
 
+  const handleRecognizedSpeech = useCallback((text: string) => {
+    if (text.toLowerCase().includes(question.answer.toLowerCase())) {
+      onAnswer(true);
+    } else {
+      onAnswer(false);
+    }
+  }, [question.answer, onAnswer]);
+
   // Speech interaction setup
-  const { isSpeaking, isListening } = useSpeechInteraction({
+  const { isSpeaking, isListening, speak } = useSpeechInteraction({
     text: question.text,
-    onRecognizedSpeech: (text) => {
-      if (text.toLowerCase().includes(question.answer.toLowerCase())) {
-        onAnswer(true);
-      } else {
-        onAnswer(false);
-      }
-    },
-    autoStart: true
+    onRecognizedSpeech: handleRecognizedSpeech,
+    autoStart: false
   });
 
   // Update speech state
@@ -43,14 +48,18 @@ export function PointOnImage({
     onSpeechStateChange(isSpeaking, isListening);
   }, [isSpeaking, isListening, onSpeechStateChange]);
 
-  const updateSpotlightPosition = () => {
+  const handleStart = useCallback(() => {
+    setStarted(true);
+    speak();
+  }, [speak]);
+
+  const updateSpotlightPosition = useCallback(() => {
     if (!imageRef.current || !question.presentation.coordinates) return;
 
     const rect = imageRef.current.getBoundingClientRect();
     const coords = question.presentation.coordinates;
     const scrollY = window.scrollY;
     const scrollX = window.scrollX;
-    console.log(rect, coords);
 
     // Calculate center position in absolute page coordinates
     const centerX = rect.left + (coords.x + coords.width / 2) * rect.width + scrollX;
@@ -65,29 +74,25 @@ export function PointOnImage({
       x: centerX,
       y: centerY,
       radius,
-      show: true
+      show: started // Only show spotlight after starting
     });
-  };
+  }, [question.presentation.coordinates, started]);
 
   // Calculate spotlight position and size
   useEffect(() => {
     updateSpotlightPosition();
-  }, [question.presentation.coordinates, imageUrl]);
+  }, [updateSpotlightPosition]);
 
   // Update spotlight on window resize and scroll
   useEffect(() => {
-    const handleUpdate = () => {
-      updateSpotlightPosition();
-    };
-
-    window.addEventListener('resize', handleUpdate);
-    window.addEventListener('scroll', handleUpdate);
+    window.addEventListener('resize', updateSpotlightPosition);
+    window.addEventListener('scroll', updateSpotlightPosition);
     
     return () => {
-      window.removeEventListener('resize', handleUpdate);
-      window.removeEventListener('scroll', handleUpdate);
+      window.removeEventListener('resize', updateSpotlightPosition);
+      window.removeEventListener('scroll', updateSpotlightPosition);
     };
-  }, [question.presentation.coordinates]);
+  }, [updateSpotlightPosition]);
 
   return (
     <div className="relative w-full max-w-2xl mx-auto" ref={containerRef}>
@@ -99,50 +104,58 @@ export function PointOnImage({
           className="w-full h-auto"
           onLoad={updateSpotlightPosition}
         />
-      </div>
-      
-      <div className="mt-4 text-lg text-center flex flex-col items-center gap-2">
-        <p>{question.text}</p>
-        <div className="text-sm text-gray-500">
-          {isSpeaking ? 'Speaking...' : isListening ? 'Listening for your answer...' : 'Please say your answer'}
-        </div>
-      </div>
-      
-      {spotlightConfig.show && (
-        <Spotlight
-          x={spotlightConfig.x}
-          y={spotlightConfig.y}
-          radius={spotlightConfig.radius}
-          color="rgba(0, 0, 0, 0.85)"
-          borderColor="#fff"
-          borderWidth={2}
-          usePercentage={false}
-          responsive={false}
-          animSpeed={1000}
-          outerStyles={{
-            border: 'none'
-          }}
-          innerStyles={{
-            filter: 'blur(30px)',
-          }}
-        >
-          <div 
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '-20px',
-              transform: 'translate(-50%, -100%)',
-              color: '#fff',
-              textShadow: '0 0 4px rgba(0,0,0,0.5)',
-              whiteSpace: 'nowrap',
-              fontSize: '14px',
-              
+        {spotlightConfig.show && (
+          <Spotlight
+            x={spotlightConfig.x}
+            y={spotlightConfig.y}
+            radius={spotlightConfig.radius}
+            color="rgba(0, 0, 0, 0.85)"
+            borderColor="#fff"
+            borderWidth={2}
+            usePercentage={false}
+            responsive={false}
+            animSpeed={1000}
+            outerStyles={{
+              border: 'none'
+            }}
+            innerStyles={{
+              filter: 'blur(30px)',
             }}
           >
-            {isSpeaking ? 'Look here!' : 'What is this?'}
+            <div 
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '-20px',
+                transform: 'translate(-50%, -100%)',
+                color: '#fff',
+                textShadow: '0 0 4px rgba(0,0,0,0.5)',
+                whiteSpace: 'nowrap',
+                fontSize: '14px',
+              }}
+            >
+              {isSpeaking ? 'Look here!' : 'What is this?'}
+            </div>
+          </Spotlight>
+        )}
+      </div>
+      
+      <div className="mt-4 text-lg text-center flex flex-col items-center gap-4">
+        {!started ? (
+          <Button 
+            onClick={handleStart}
+            size="lg"
+            className="gap-2"
+          >
+            <Play className="w-4 h-4" />
+            Start Practice
+          </Button>
+        ) : (
+          <div className="text-muted-foreground">
+            {isSpeaking ? 'Speaking...' : isListening ? 'Listening for your answer...' : 'Please say your answer'}
           </div>
-        </Spotlight>
-      )}
+        )}
+      </div>
     </div>
   );
 }
