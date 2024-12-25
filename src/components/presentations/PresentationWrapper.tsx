@@ -5,9 +5,15 @@ interface PresentationWrapperProps {
   question: Question;
   imageUrl: string;
   onAnswer: (correct: boolean) => void;
+  onSpeechStateChange: (speaking: boolean, listening: boolean) => void;
 }
 
-export function PresentationWrapper({ question, imageUrl, onAnswer }: PresentationWrapperProps) {
+export function PresentationWrapper({ 
+  question, 
+  imageUrl, 
+  onAnswer,
+  onSpeechStateChange 
+}: PresentationWrapperProps) {
   switch (question.presentation.type) {
     case 'point_on_image':
       return (
@@ -15,6 +21,7 @@ export function PresentationWrapper({ question, imageUrl, onAnswer }: Presentati
           question={question}
           imageUrl={imageUrl}
           onAnswer={onAnswer}
+          onSpeechStateChange={onSpeechStateChange}
         />
       );
     // Add other presentation types here as they are implemented

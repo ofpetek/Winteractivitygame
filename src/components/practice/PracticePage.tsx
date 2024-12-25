@@ -6,6 +6,7 @@ import { PresentationWrapper } from '../presentations/PresentationWrapper';
 import { Question } from '../../../presentations';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router-dom';
+import { SiriWaveWrapper } from '../common/SiriWaveWrapper';
 
 export function PracticePage() {
   const { practiceId } = useParams();
@@ -18,6 +19,8 @@ export function PracticePage() {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     const fetchPractice = async () => {
@@ -74,6 +77,11 @@ export function PracticePage() {
     }
   };
 
+  const handleSpeechStateChange = (speaking: boolean, listening: boolean) => {
+    setIsSpeaking(speaking);
+    setIsListening(listening);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -108,6 +116,7 @@ export function PracticePage() {
             question={currentQuestion}
             imageUrl={imageUrl}
             onAnswer={handleAnswer}
+            onSpeechStateChange={handleSpeechStateChange}
           />
           
           {showFeedback && (
@@ -119,6 +128,8 @@ export function PracticePage() {
           )}
         </div>
       )}
+
+      <SiriWaveWrapper speaking={isSpeaking || isListening} />
     </div>
   );
 }

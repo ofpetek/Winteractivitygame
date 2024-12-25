@@ -1,74 +1,146 @@
 import { useState, useRef, useEffect } from 'react';
 import { Question } from '../../../presentations';
+import Spotlight from 'react-spotlight';
+import { useSpeechInteraction } from '../../hooks/useSpeechInteraction';
 
 interface PointOnImageProps {
   question: Question;
   imageUrl: string;
   onAnswer: (correct: boolean) => void;
+  onSpeechStateChange: (speaking: boolean, listening: boolean) => void;
 }
 
-export function PointOnImage({ question, imageUrl, onAnswer }: PointOnImageProps) {
-  console.log(question, imageUrl);
-  const [selectedPoint, setSelectedPoint] = useState<{ x: number; y: number } | null>(null);
+export function PointOnImage({ 
+  question, 
+  imageUrl, 
+  onAnswer,
+  onSpeechStateChange 
+}: PointOnImageProps) {
   const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [spotlightConfig, setSpotlightConfig] = useState({
+    x: 0,
+    y: 0,
+    radius: 100,
+    show: false
+  });
 
-  const handleImageClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!imageRef.current) return;
+  // Speech interaction setup
+  const { isSpeaking, isListening } = useSpeechInteraction({
+    text: question.text,
+    onRecognizedSpeech: (text) => {
+      if (text.toLowerCase().includes(question.answer.toLowerCase())) {
+        onAnswer(true);
+      } else {
+        onAnswer(false);
+      }
+    },
+    autoStart: true
+  });
 
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
+  // Update speech state
+  useEffect(() => {
+    onSpeechStateChange(isSpeaking, isListening);
+  }, [isSpeaking, isListening, onSpeechStateChange]);
 
-    setSelectedPoint({ x, y });
+  // Calculate spotlight position and size
+  useEffect(() =>
+  {
+    if (imageRef.current && question.presentation.coordinates) {
+      const rect = imageRef.current.getBoundingClientRect();
+      const coords = question.presentation.coordinates;
+      
+      // Calculate center position in percentage
+      const x = (coords.x + coords.width / 2) * 100;
+      const y = (coords.y + coords.height / 2) * 100;
+      
+      // Calculate radius based on the target area
+      const targetWidth = coords.width * rect.width;
+      const targetHeight = coords.height * rect.height;
+      const radius = Math.max(targetWidth, targetHeight) * 0.6; // Adjust this multiplier as needed
 
-    // Check if the click is within the correct area
-    const coordinates = question.presentation.coordinates;
-    if (!coordinates) return;
+      setSpotlightConfig({
+        x,
+        y,
+        radius,
+        show: true
+      });
+    }
+  }, [question.presentation.coordinates, imageUrl]);
 
-    const isCorrect = 
-      x >= coordinates.x && 
-      x <= coordinates.x + coordinates.width &&
-      y >= coordinates.y && 
-      y <= coordinates.y + coordinates.height;
+  // Update spotlight on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (imageRef.current && question.presentation.coordinates) {
+        const rect = imageRef.current.getBoundingClientRect();
+        const coords = question.presentation.coordinates;
+        
+        const x = (coords.x + coords.width / 2) * 100;
+        const y = (coords.y + coords.height / 2) * 100;
+        
+        const targetWidth = coords.width * rect.width;
+        const targetHeight = coords.height * rect.height;
+        const radius = Math.max(targetWidth, targetHeight) * 0.6;
+        
+        setSpotlightConfig(prev => ({
+          ...prev,
+          x,
+          y,
+          radius
+        }));
+      }
+    };
 
-    onAnswer(isCorrect);
-  };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [question.presentation.coordinates]);
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto">
-      <div 
-        className="relative cursor-pointer"
-        onClick={handleImageClick}
-      >
+    <div className="relative w-full max-w-2xl mx-auto" ref={containerRef}>
+      <div className="relative">
         <img
           ref={imageRef}
           src={imageUrl}
           alt={question.text}
           className="w-full h-auto"
         />
-        {selectedPoint && (
-          <div
-            className="absolute w-4 h-4 bg-red-500 rounded-full transform -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${selectedPoint.x * 100}%`,
-              top: `${selectedPoint.y * 100}%`,
-            }}
-          />
-        )}
-        {/* Debug overlay for the correct area */}
-        {question.presentation.coordinates && (
-          <div
-            className="absolute border-2 border-green-500 opacity-30"
-            style={{
-              left: `${question.presentation.coordinates.x * 100}%`,
-              top: `${question.presentation.coordinates.y * 100}%`,
-              width: `${question.presentation.coordinates.width * 100}%`,
-              height: `${question.presentation.coordinates.height * 100}%`,
-            }}
-          />
-        )}
       </div>
-      <p className="mt-4 text-lg text-center">{question.text}</p>
+      
+      <div className="mt-4 text-lg text-center flex flex-col items-center gap-2">
+        <p>{question.text}</p>
+        <div className="text-sm text-gray-500">
+          {isSpeaking ? 'Speaking...' : isListening ? 'Listening for your answer...' : 'Please say your answer'}
+        </div>
+      </div>
+      
+      {spotlightConfig.show && (
+        <Spotlight
+          x={spotlightConfig.x}
+          y={spotlightConfig.y}
+          radius={spotlightConfig.radius}
+          color="rgba(0, 0, 0, 0.85)"
+          borderColor="#fff"
+          borderWidth={2}
+          usePercentage
+          responsive
+          animSpeed={1000}
+        >
+          <div 
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '-20px',
+              transform: 'translate(-50%, -100%)',
+              color: '#fff',
+              textShadow: '0 0 4px rgba(0,0,0,0.5)',
+              whiteSpace: 'nowrap',
+              fontSize: '14px'
+            }}
+          >
+            {isSpeaking ? 'Look here!' : 'What is this?'}
+          </div>
+        </Spotlight>
+      )}
     </div>
   );
 }
