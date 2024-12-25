@@ -43,56 +43,50 @@ export function PointOnImage({
     onSpeechStateChange(isSpeaking, isListening);
   }, [isSpeaking, isListening, onSpeechStateChange]);
 
-  // Calculate spotlight position and size
-  useEffect(() =>
-  {
-    if (imageRef.current && question.presentation.coordinates) {
-      const rect = imageRef.current.getBoundingClientRect();
-      const coords = question.presentation.coordinates;
-      
-      // Calculate center position in percentage
-      const x = (coords.x + coords.width / 2) * 100;
-      const y = (coords.y + coords.height / 2) * 100;
-      
-      // Calculate radius based on the target area
-      const targetWidth = coords.width * rect.width;
-      const targetHeight = coords.height * rect.height;
-      const radius = Math.max(targetWidth, targetHeight) * 0.6; // Adjust this multiplier as needed
+  const updateSpotlightPosition = () => {
+    if (!imageRef.current || !question.presentation.coordinates) return;
 
-      setSpotlightConfig({
-        x,
-        y,
-        radius,
-        show: true
-      });
-    }
+    const rect = imageRef.current.getBoundingClientRect();
+    const coords = question.presentation.coordinates;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+    console.log(rect, coords);
+
+    // Calculate center position in absolute page coordinates
+    const centerX = rect.left + (coords.x + coords.width / 2) * rect.width + scrollX;
+    const centerY = rect.top + (coords.y + coords.height / 2) * rect.height + scrollY;
+
+    // Calculate radius based on the target area in pixels
+    const targetWidth = coords.width * rect.width;
+    const targetHeight = coords.height * rect.height;
+    const radius = Math.max(targetWidth, targetHeight) * 2;
+
+    setSpotlightConfig({
+      x: centerX,
+      y: centerY,
+      radius,
+      show: true
+    });
+  };
+
+  // Calculate spotlight position and size
+  useEffect(() => {
+    updateSpotlightPosition();
   }, [question.presentation.coordinates, imageUrl]);
 
-  // Update spotlight on window resize
+  // Update spotlight on window resize and scroll
   useEffect(() => {
-    const handleResize = () => {
-      if (imageRef.current && question.presentation.coordinates) {
-        const rect = imageRef.current.getBoundingClientRect();
-        const coords = question.presentation.coordinates;
-        
-        const x = (coords.x + coords.width / 2) * 100;
-        const y = (coords.y + coords.height / 2) * 100;
-        
-        const targetWidth = coords.width * rect.width;
-        const targetHeight = coords.height * rect.height;
-        const radius = Math.max(targetWidth, targetHeight) * 0.6;
-        
-        setSpotlightConfig(prev => ({
-          ...prev,
-          x,
-          y,
-          radius
-        }));
-      }
+    const handleUpdate = () => {
+      updateSpotlightPosition();
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('scroll', handleUpdate);
+    
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate);
+    };
   }, [question.presentation.coordinates]);
 
   return (
@@ -103,6 +97,7 @@ export function PointOnImage({
           src={imageUrl}
           alt={question.text}
           className="w-full h-auto"
+          onLoad={updateSpotlightPosition}
         />
       </div>
       
@@ -121,9 +116,15 @@ export function PointOnImage({
           color="rgba(0, 0, 0, 0.85)"
           borderColor="#fff"
           borderWidth={2}
-          usePercentage
-          responsive
+          usePercentage={false}
+          responsive={false}
           animSpeed={1000}
+          outerStyles={{
+            border: 'none'
+          }}
+          innerStyles={{
+            filter: 'blur(30px)',
+          }}
         >
           <div 
             style={{
@@ -134,7 +135,8 @@ export function PointOnImage({
               color: '#fff',
               textShadow: '0 0 4px rgba(0,0,0,0.5)',
               whiteSpace: 'nowrap',
-              fontSize: '14px'
+              fontSize: '14px',
+              
             }}
           >
             {isSpeaking ? 'Look here!' : 'What is this?'}
