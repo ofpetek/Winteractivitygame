@@ -119,7 +119,9 @@ export const onPracticeUpdated = onDocumentUpdated('practices/{practiceId}', asy
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
     const imageData = { data: base64Image, mimeType: 'image/png' };
 
-    const questions = await generateQuestionsFromImage(
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    //@ts-expect-error
+    const { questions } = await generateQuestionsFromImage(
       imageData,
       afterData.description
     );

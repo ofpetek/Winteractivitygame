@@ -13,6 +13,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AdminPage } from './components/admin/AdminPage';
 import { WeekManager } from './components/admin/WeekManager';
 import { GamePage } from './components/game/GamePage';
+import { PracticePage } from './components/practice/PracticePage';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { app } from './firebaseConfig';
 
@@ -49,17 +50,13 @@ function App() {
                 <div className="app">
                     <VoiceSettingsDialog />
                     <Routes>
+                        <Route path="/" element={isLoggedIn ? <GamePage /> : <Login onLogin={handleLogin} />} />
                         <Route path="/admin" element={<AdminPage />} />
+                        <Route path="/admin/weeks" element={<WeekManager />} />
+                        <Route path="/practice/:practiceId" element={<PracticePage />} />
                         <Route path="/admin/week/:weekId" element={<WeekManager />} />
-                        <Route
-                            path="/"
-                            element={
-                                !isLoggedIn ? (
-                                    <Login onLogin={handleLogin} />
-                                ) : (<GamePage />)
-                            }
-                        />
                     </Routes>
+
                 </div>
             </Router>
         </VoiceSettingsProvider>
