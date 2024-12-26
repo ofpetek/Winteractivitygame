@@ -364,7 +364,7 @@ export const evaluateAnswer = functions.https.onRequest(async (req, res) => {
     const response = await result.response;
     const evaluation = JSON.parse(response.text());
 
-    res.status(200).json(evaluation);
+    res.status(200).json({data: evaluation});
   } catch (error) {
     console.error('Error in evaluateAnswer:', error);
     res.status(500).send('Internal Server Error');

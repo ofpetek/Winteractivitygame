@@ -43,23 +43,31 @@ export function PointOnImage({
   }, []);
 
   // Speech interaction setup
-  const { isSpeaking, isListening, speak, startListening, stopListening } = useSpeechInteraction({
+  const { isSpeaking, isListening, speak, startListening, stopListening, isGivingFeedback } = useSpeechInteraction({
     text: question.text,
     onRecognizedSpeech: handleRecognizedSpeech,
     expectedAnswer: question.answer,
     onEvaluated: (result) => {
       console.log('📊 Answer evaluation:', result);
-      onAnswer(result.isCorrect);
-      // You might want to show feedback to the user here
-      // For example, using a toast notification
+      
+      // Only proceed to next question if the answer is correct and after feedback
+      if (result.isCorrect) {
+        // Wait for feedback to finish before moving to next question
+        const checkFeedback = setInterval(() => {
+          if (!isGivingFeedback) {
+            clearInterval(checkFeedback);
+            onAnswer(true);
+          }
+        }, 100);
+      }
     },
     autoStart: false
   });
 
-  // Update speech state
+  // Update speech state to include feedback state
   useEffect(() => {
-    onSpeechStateChange(isSpeaking, isListening);
-  }, [isSpeaking, isListening, onSpeechStateChange]);
+    onSpeechStateChange(isSpeaking || isGivingFeedback, isListening);
+  }, [isSpeaking, isListening, isGivingFeedback, onSpeechStateChange]);
 
   const handleStart = useCallback(() => {
     setStarted(true);

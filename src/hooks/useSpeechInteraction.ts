@@ -21,6 +21,8 @@ export function useSpeechInteraction({
 {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [feedback, setFeedback] = useState<string>('');
+  const [isGivingFeedback, setIsGivingFeedback] = useState(false);
   const { settings } = useVoiceSettings();
   const { setAudioLevel } = useVoiceLevel();
   const hasSpoken = useRef(false);
@@ -81,11 +83,18 @@ export function useSpeechInteraction({
       if (expectedAnswer && onEvaluated) {
         const evaluationService = AnswerEvaluationService.getInstance();
         const result = await evaluationService.evaluateAnswer(audioBlob, text, expectedAnswer);
-        onEvaluated(result);
         
-        // Mark as answered and stop listening
-        hasAnswered.current = true;
+        // Stop listening before giving feedback
         stopListening();
+        hasAnswered.current = true;
+
+        // Speak feedback
+        const feedbackText = result.feedback + (result.suggestion ? ` ${result.suggestion}` : '');
+        setFeedback(feedbackText);
+        speakFeedback(feedbackText);
+        
+        // Call onEvaluated after starting feedback
+        onEvaluated(result);
       }
     } catch (error) {
       console.error('Error processing audio:', error);
@@ -238,6 +247,19 @@ export function useSpeechInteraction({
     }
   }, [text, settings, isSpeaking, autoStart, startListening]);
 
+  const speakFeedback = useCallback((feedbackText: string) => {
+    if (!feedbackText) return;
+    
+    setIsGivingFeedback(true);
+    const utterance = new SpeechSynthesisUtterance(feedbackText);
+    utterance.lang = settings.language || 'en-US';
+    utterance.rate = settings.rate || 1;
+    utterance.onend = () => {
+      setIsGivingFeedback(false);
+    };
+    window.speechSynthesis.speak(utterance);
+  }, [settings.language, settings.rate]);
+
   // Reset hasAnswered when text changes
   useEffect(() => {
     hasAnswered.current = false;
@@ -249,6 +271,8 @@ export function useSpeechInteraction({
     isListening,
     startListening,
     stopListening,
+    feedback,
+    isGivingFeedback,
     hasSpoken: hasSpoken.current
   };
 }
