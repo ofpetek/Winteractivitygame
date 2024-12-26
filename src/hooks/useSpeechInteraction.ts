@@ -11,12 +11,12 @@ interface UseSpeechInteractionProps {
   autoStart?: boolean;
 }
 
-export function useSpeechInteraction({ 
-  text, 
+export function useSpeechInteraction({
+  text,
   onRecognizedSpeech,
   expectedAnswer,
   onEvaluated,
-  autoStart = true 
+  autoStart = false
 }: UseSpeechInteractionProps)
 {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -27,6 +27,16 @@ export function useSpeechInteraction({
   const { setAudioLevel } = useVoiceLevel();
   const hasSpoken = useRef(false);
   const hasAnswered = useRef(false);
+  const currentText = useRef(text);
+  const currentExpectedAnswer = useRef(expectedAnswer);
+
+  // Update refs when text or expectedAnswer change
+  useEffect(() => {
+    currentText.current = text;
+    currentExpectedAnswer.current = expectedAnswer;
+    hasAnswered.current = false;
+    hasSpoken.current = false;
+  }, [text, expectedAnswer]);
 
   // Audio recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -80,9 +90,13 @@ export function useSpeechInteraction({
       }
 
       // If we have an expected answer, evaluate it
-      if (expectedAnswer && onEvaluated) {
+      if (currentExpectedAnswer.current && onEvaluated) {
         const evaluationService = AnswerEvaluationService.getInstance();
-        const result = await evaluationService.evaluateAnswer(audioBlob, text, expectedAnswer);
+        const result = await evaluationService.evaluateAnswer(
+          audioBlob, 
+          currentText.current, 
+          currentExpectedAnswer.current
+        );
         
         // Stop listening before giving feedback
         stopListening();
@@ -259,11 +273,6 @@ export function useSpeechInteraction({
     };
     window.speechSynthesis.speak(utterance);
   }, [settings.language, settings.rate]);
-
-  // Reset hasAnswered when text changes
-  useEffect(() => {
-    hasAnswered.current = false;
-  }, [text]);
 
   return {
     speak,
