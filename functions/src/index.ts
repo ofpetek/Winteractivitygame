@@ -267,22 +267,94 @@ export const processAudio = functions.https.onRequest(async (req, res) => {
 });
 
 export const evaluateAnswer = functions.https.onRequest(async (req, res) => {
-  // Handle OPTIONS request
-  if (req.method === 'OPTIONS') {
-    res.set('Access-Control-Allow-Origin', '*'); // Allow requests from any origin
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS'); // Allow POST and OPTIONS methods
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow Content-Type and Authorization headers
-    res.end(); // Send a response to the preflight request
-    return;
+  try {
+    // Handle OPTIONS request
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.end();
+      return;
+    }
+
+    // Ensure this is a POST request
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+
+    // Allow cors
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+    // Validate request body
+    const { audioData, question, expectedAnswer } = req.body.data;
+    if (!audioData || !audioData.data || !audioData.mimeType || !question || !expectedAnswer) {
+      res.status(400).send('Missing required fields: audioData, question, or expectedAnswer');
+      return;
+    }
+
+    if (process.env.GOOGLE_GENAI_API_KEY === undefined) {
+      res.status(500).send('Missing required environment variable: GOOGLE_GENAI_API_KEY');
+      return;
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY);
+    if (!genAI) {
+      res.status(500).send('Failed to initialize Generative AI');
+      return;
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp",
+      systemInstruction: `You are an educational assistant evaluating a child's verbal response to a language learning question.
+      Your role is to:
+      1. Compare the child's spoken answer to the expected answer
+      2. Evaluate if the answer is correct, partially correct, or incorrect
+      3. Provide encouraging feedback appropriate for a child
+      4. If the answer is incorrect or partially correct, explain why in a child-friendly way
+      5. Give a suggestion for improvement if needed`,
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            isCorrect: { type: SchemaType.BOOLEAN },
+            score: { type: SchemaType.NUMBER },
+            feedback: { type: SchemaType.STRING },
+            suggestion: { type: SchemaType.STRING, nullable: true },
+          },
+          required: ["isCorrect", "feedback"],
+        },
+      },
+    });
+
+    // Generate content using the audio data
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: audioData.mimeType,
+          data: audioData.data
+        }
+      },
+      {
+        text: `Question: "${question}"
+        Expected Answer: "${expectedAnswer}"
+        Please evaluate the audio response.`
+      }
+    ]);
+
+    const response = await result.response;
+    const evaluation = JSON.parse(response.text());
+
+    res.status(200).json(evaluation);
+  } catch (error) {
+    console.error('Error in evaluateAnswer:', error);
+    res.status(500).send('Internal Server Error');
   }
-  // Ensure this is a POST request
-  if (req.method !== 'POST') {
-    res.status(405).send('Method Not Allowed');
-    return;
-  }
-  // Allow cors
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow Content-Type and Authorization headers
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS'); // Allow POST and OPTIONS methods
-  res.json({ result: 'answer' });
 });

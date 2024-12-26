@@ -1,16 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVoiceSettings } from '../contexts/VoiceSettingsContext';
 import { useVoiceLevel } from '../contexts/VoiceLevelContext';
+import { AnswerEvaluationService } from '../services/AnswerEvaluationService';
 
 interface UseSpeechInteractionProps {
   text: string;
   onRecognizedSpeech: (text: string) => void;
+  expectedAnswer?: string;
+  onEvaluated?: (result: { isCorrect: boolean; score: number; feedback: string; suggestion?: string }) => void;
   autoStart?: boolean;
 }
 
 export function useSpeechInteraction({ 
   text, 
   onRecognizedSpeech,
+  expectedAnswer,
+  onEvaluated,
   autoStart = true 
 }: UseSpeechInteractionProps)
 {
@@ -53,6 +58,13 @@ export function useSpeechInteraction({
           mimeType: 'audio/wav',
           data: base64Audio
         });
+        
+        // If we have an expected answer, evaluate it
+        if (expectedAnswer && onEvaluated) {
+          const evaluationService = AnswerEvaluationService.getInstance();
+          const result = await evaluationService.evaluateAnswer(audioBlob, text, expectedAnswer);
+          onEvaluated(result);
+        }
       };
       reader.readAsDataURL(audioBlob);
     } catch (error) {
