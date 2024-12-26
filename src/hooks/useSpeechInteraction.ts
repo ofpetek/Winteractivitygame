@@ -24,6 +24,7 @@ export function useSpeechInteraction({
   const { settings } = useVoiceSettings();
   const { setAudioLevel } = useVoiceLevel();
   const hasSpoken = useRef(false);
+  const hasAnswered = useRef(false);
 
   // Audio recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -50,23 +51,42 @@ export function useSpeechInteraction({
 
   const processAudio = async (audioBlob: Blob) => {
     try {
+      // Skip if already answered
+      if (hasAnswered.current) {
+        return;
+      }
+
       console.log('Processing audio...');
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        console.log('Audio data:', {
-          mimeType: 'audio/wav',
-          data: base64Audio
-        });
+      
+      // Check if audio is silent
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioBlob.arrayBuffer();
+      const buffer = await audioContext.decodeAudioData(audioBuffer);
+      const channelData = buffer.getChannelData(0);
+      
+      // Calculate RMS of the audio
+      let sumSquares = 0;
+      for (let i = 0; i < channelData.length; i++) {
+        sumSquares += channelData[i] * channelData[i];
+      }
+      const rms = Math.sqrt(sumSquares / channelData.length);
+      
+      console.log('RMS:', rms);
+      if (rms < 0.03) {
+        console.log('🔇 Audio is too silent, skipping evaluation');
+        return;
+      }
+
+      // If we have an expected answer, evaluate it
+      if (expectedAnswer && onEvaluated) {
+        const evaluationService = AnswerEvaluationService.getInstance();
+        const result = await evaluationService.evaluateAnswer(audioBlob, text, expectedAnswer);
+        onEvaluated(result);
         
-        // If we have an expected answer, evaluate it
-        if (expectedAnswer && onEvaluated) {
-          const evaluationService = AnswerEvaluationService.getInstance();
-          const result = await evaluationService.evaluateAnswer(audioBlob, text, expectedAnswer);
-          onEvaluated(result);
-        }
-      };
-      reader.readAsDataURL(audioBlob);
+        // Mark as answered and stop listening
+        hasAnswered.current = true;
+        stopListening();
+      }
     } catch (error) {
       console.error('Error processing audio:', error);
     }
@@ -217,6 +237,11 @@ export function useSpeechInteraction({
       window.speechSynthesis.speak(utterance);
     }
   }, [text, settings, isSpeaking, autoStart, startListening]);
+
+  // Reset hasAnswered when text changes
+  useEffect(() => {
+    hasAnswered.current = false;
+  }, [text]);
 
   return {
     speak,

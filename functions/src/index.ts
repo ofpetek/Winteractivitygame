@@ -310,11 +310,21 @@ export const evaluateAnswer = functions.https.onRequest(async (req, res) => {
       model: "gemini-2.0-flash-exp",
       systemInstruction: `You are an educational assistant evaluating a child's verbal response to a language learning question.
       Your role is to:
-      1. Compare the child's spoken answer to the expected answer
-      2. Evaluate if the answer is correct, partially correct, or incorrect
-      3. Provide encouraging feedback appropriate for a child
-      4. If the answer is incorrect or partially correct, explain why in a child-friendly way
-      5. Give a suggestion for improvement if needed`,
+      1. Listen carefully to the audio response
+      2. If you cannot hear any clear speech or the audio is silent, respond with:
+         {
+           "isCorrect": false,
+           "score": 0,
+           "feedback": "I couldn't hear your answer clearly. Could you please speak a bit louder?"
+         }
+      3. If you can hear the response:
+         - Compare it to the expected answer
+         - Evaluate if it's correct, partially correct, or incorrect
+         - Provide encouraging feedback appropriate for a child
+         - If partially correct or incorrect, explain why in a child-friendly way
+         - Give a suggestion for improvement if needed,
+         - IMPORTANT! if pronounciation is off, give feedback about that
+      4. IMPORTANT! NEVER mark a silent or unclear response as correct`,
       generationConfig: {
         temperature: 0.7,
         topP: 0.8,
@@ -328,6 +338,7 @@ export const evaluateAnswer = functions.https.onRequest(async (req, res) => {
             score: { type: SchemaType.NUMBER },
             feedback: { type: SchemaType.STRING },
             suggestion: { type: SchemaType.STRING, nullable: true },
+            unclear: { type: SchemaType.BOOLEAN, nullable: true },
           },
           required: ["isCorrect", "feedback"],
         },
@@ -345,7 +356,8 @@ export const evaluateAnswer = functions.https.onRequest(async (req, res) => {
       {
         text: `Question: "${question}"
         Expected Answer: "${expectedAnswer}"
-        Please evaluate the audio response.`
+        Please evaluate the audio response. If the audio is silent or unclear, respond with: unclear
+        IMPORTANT! NEVER mark a silent or unclear response as correct`
       }
     ]);
 
