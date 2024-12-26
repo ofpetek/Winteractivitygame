@@ -23,19 +23,21 @@ export function PointOnImage({
   const [started, setStarted] = useState(false);
   const questionRef = useRef(question);
   const hasStartedRef = useRef(false);
+  const isFirstQuestion = useRef(true);
 
   // Reset started state when question changes
   useEffect(() => {
     if (questionRef.current !== question) {
       setStarted(false);
       hasStartedRef.current = false;
+      isFirstQuestion.current = false;
       questionRef.current = question;
     }
   }, [question]);
 
-  // Auto-start new questions
+  // Auto-start new questions unless it is the first one
   useEffect(() => {
-    if (!started && !hasStartedRef.current) {
+    if (!started && !hasStartedRef.current && !isFirstQuestion.current) {
       hasStartedRef.current = true;
       handleStart();
     }
