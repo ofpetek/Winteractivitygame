@@ -6,9 +6,9 @@ import { useEffect } from 'react';
 export function SiriWaveWrapper() {
   const { audioLevel } = useVoiceLevel();
   
-  useEffect(() => {
-    console.log('audioLevel', audioLevel);
-  }, [audioLevel]);
+  // useEffect(() => {
+  //   console.log('audioLevel', audioLevel);
+  // }, [audioLevel]);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/20 to-transparent">

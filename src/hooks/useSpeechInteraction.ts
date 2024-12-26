@@ -150,7 +150,7 @@ export function useSpeechInteraction({
 
     // Log audio level every 500ms to avoid console spam
     if (Date.now() % 500 < 50) {
-      console.log('🎤 Audio level (RMS):', rms.toFixed(2), 'Threshold:', settings.silenceThreshold);
+      // console.log('🎤 Audio level (RMS):', rms.toFixed(2), 'Threshold:', settings.silenceThreshold);
     }
 
     if (rms < Math.abs(settings.silenceThreshold)) {
@@ -264,15 +264,21 @@ export function useSpeechInteraction({
   const speakFeedback = useCallback((feedbackText: string) => {
     if (!feedbackText) return;
     
+    console.log('🗣️ Starting feedback speech:', feedbackText);
     setIsGivingFeedback(true);
     const utterance = new SpeechSynthesisUtterance(feedbackText);
     utterance.lang = settings.language || 'en-US';
     utterance.rate = settings.rate || 1;
     utterance.onend = () => {
+      console.log('🎤 Feedback speech ended');
       setIsGivingFeedback(false);
     };
     window.speechSynthesis.speak(utterance);
   }, [settings.language, settings.rate]);
+
+  useEffect(() => {
+    console.log('🎭 Feedback state changed:', isGivingFeedback);
+  }, [isGivingFeedback]);
 
   return {
     speak,

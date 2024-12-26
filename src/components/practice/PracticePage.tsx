@@ -53,21 +53,26 @@ export function PracticePage() {
   }, [practiceId]);
 
   const handleAnswer = (correct: boolean) => {
+    console.log('🎯 handleAnswer called with correct:', correct);
+    console.log('📚 Current question index:', currentQuestionIndex);
+    console.log('📚 Total questions:', questions.length);
+    
     setIsCorrect(correct);
     setShowFeedback(true);
 
     if (correct) {
       // Move to next question after feedback finishes
       if (currentQuestionIndex < questions.length - 1) {
+        console.log('✨ Moving to next question:', currentQuestionIndex + 1);
         setCurrentQuestionIndex(prev => prev + 1);
-        // Hide feedback when moving to next question
         setShowFeedback(false);
       } else {
+        console.log('🎉 Practice completed!');
         // Practice completed
         setTimeout(() => {
           alert('Practice completed!');
           navigate('/');
-        }, 1000); // Small delay to ensure feedback is heard
+        }, 1000);
       }
     } else {
       // Hide feedback after a brief moment for incorrect answers
@@ -76,6 +81,10 @@ export function PracticePage() {
       }, 1500);
     }
   };
+
+  useEffect(() => {
+    console.log('🔄 Question changed to index:', currentQuestionIndex);
+  }, [currentQuestionIndex]);
 
   const handleSpeechStateChange = (speaking: boolean, listening: boolean) => {
     setIsSpeaking(speaking);
