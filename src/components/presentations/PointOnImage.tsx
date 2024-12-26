@@ -21,6 +21,26 @@ export function PointOnImage({
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [started, setStarted] = useState(false);
+  const questionRef = useRef(question);
+  const hasStartedRef = useRef(false);
+
+  // Reset started state when question changes
+  useEffect(() => {
+    if (questionRef.current !== question) {
+      setStarted(false);
+      hasStartedRef.current = false;
+      questionRef.current = question;
+    }
+  }, [question]);
+
+  // Auto-start new questions
+  useEffect(() => {
+    if (!started && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      handleStart();
+    }
+  }, [started]);
+
   const [spotlightConfig, setSpotlightConfig] = useState({
     x: 0,
     y: 0,
@@ -76,11 +96,11 @@ export function PointOnImage({
 
   // Start listening when speech ends
   useEffect(() => {
-    if (started && !isSpeaking) {
+    if (started && !isSpeaking && !isGivingFeedback) {
       console.log('🎤 Speech ended, starting to listen...');
       startListening();
     }
-  }, [started, isSpeaking, startListening]);
+  }, [started, isSpeaking, isGivingFeedback, startListening]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -57,20 +57,20 @@ export function PracticePage() {
     setShowFeedback(true);
 
     if (correct) {
-      // Wait for feedback animation
-      setTimeout(() => {
+      // Move to next question after feedback finishes
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        // Hide feedback when moving to next question
         setShowFeedback(false);
-        if (currentQuestionIndex < questions.length - 1) {
-          setCurrentQuestionIndex(prev => prev + 1);
-        } else {
-          // Practice completed
-          // You might want to navigate to a success page or show a completion modal
+      } else {
+        // Practice completed
+        setTimeout(() => {
           alert('Practice completed!');
-          navigate('/'); // Or wherever you want to go after completion
-        }
-      }, 1500);
+          navigate('/');
+        }, 1000); // Small delay to ensure feedback is heard
+      }
     } else {
-      // Show incorrect feedback briefly
+      // Hide feedback after a brief moment for incorrect answers
       setTimeout(() => {
         setShowFeedback(false);
       }, 1500);
