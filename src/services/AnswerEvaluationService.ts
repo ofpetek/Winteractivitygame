@@ -22,10 +22,9 @@ export class AnswerEvaluationService {
     return this.instance;
   }
 
-  public async evaluateAnswer(audioBlob: Blob, question: string, expectedAnswer: string): Promise<EvaluationResult> {
+  public async evaluateAnswer(base64Audio: string, question: string, expectedAnswer: string): Promise<EvaluationResult> {
     try {
-      // Convert blob to base64
-      const base64Audio = await this.blobToBase64(audioBlob);
+      
       
       // Call Firebase function with data property
       const result = await this.evaluateAnswerCall({
@@ -34,7 +33,7 @@ export class AnswerEvaluationService {
             data: base64Audio
           },
           question,
-          expectedAnswer
+          expectedAnswer,
       });
 
       return result.data as EvaluationResult;
@@ -42,17 +41,5 @@ export class AnswerEvaluationService {
       console.error('Evaluation error:', error);
       throw error;
     }
-  }
-
-  private blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        resolve(base64Audio);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
   }
 }

@@ -1,10 +1,10 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useVoiceSettings } from '../contexts/VoiceSettingsContext';
 import { useVoiceLevel } from '../contexts/VoiceLevelContext';
 import { AnswerEvaluationService } from '../services/AnswerEvaluationService';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { startRecording, stopRecording, setAudioBlob } from '../slices/audioSlice';
+import { startRecording, stopRecording, setAudioData } from '../slices/audioSlice';
 import { startSpeaking, setFeedbackText, startGivingFeedback, stopGivingFeedback } from '../slices/speechSlice';
 import { AudioRecordingManager } from '../services/AudioRecordingManager';
 import { SpeechManager } from '../services/SpeechManager';
@@ -17,145 +17,194 @@ interface UseSpeechInteractionProps {
   autoStart?: boolean;
 }
 
-export function useSpeechInteraction({
+export const useSpeechInteraction = ({
   text,
   expectedAnswer,
   onEvaluated,
   autoStart = true
-}: UseSpeechInteractionProps) {
+}: UseSpeechInteractionProps) => {
   const dispatch = useDispatch();
-  const isSpeaking = useSelector((state: RootState) => state.speech.isSpeaking);
-  const isGivingFeedback = useSelector((state: RootState) => state.speech.isGivingFeedback);
-  const feedback = useSelector((state: RootState) => state.speech.feedbackText);
-  const isListening = useSelector((state: RootState) => state.audio.isRecording);
   const { settings } = useVoiceSettings();
   const { setAudioLevel } = useVoiceLevel();
-  const hasSpoken = useRef(false);
-  const hasAnswered = useRef(false);
-  const audioRecordingManager = useRef(new AudioRecordingManager()).current;
-  const speechManager = useRef(SpeechManager.getInstance()).current;
-
+  const isListening = useSelector((state: RootState) => state.audio.isRecording);
+  const isSpeaking = useSelector((state: RootState) => state.speech.isSpeaking);
+  const feedback = useSelector((state: RootState) => state.speech.feedbackText);
+  const isGivingFeedback = useSelector((state: RootState) => state.speech.isGivingFeedback);
+  
   // Audio recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const isListeningRef = useRef(false);
+  const silenceDetectionStartTime = useRef(0);
+  const audioRecordingManager = useMemo(() => new AudioRecordingManager(), []);
+  const speechManager = useMemo(() => SpeechManager.getInstance(), []);
+  const isStartingRef = useRef(false);
+  const hasSpoken = useRef(false);
+  const hasAnswered = useRef(false);
+  const lastSpeechStateChange = useRef(Date.now());
+  const stateChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup function
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-      }
       if (silenceTimeoutRef.current) {
         clearTimeout(silenceTimeoutRef.current);
       }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+      if (stateChangeTimeoutRef.current) {
+        clearTimeout(stateChangeTimeoutRef.current);
       }
+      audioRecordingManager.dispose();
     };
-  }, []);
+  }, [audioRecordingManager]);
 
-  const processAudio = async (audioBlob: Blob) => {
+  const stopListening = useCallback(async () => {
+    // Prevent rapid start/stop cycles
+    const now = Date.now();
+    if (now - lastSpeechStateChange.current < 500) {
+      console.log('⏱️ Ignoring stop request - too soon after state change');
+      return;
+    }
+
+    console.log('🛑 stopListening called, current state:', {
+      isListening,
+      isListeningRef: isListeningRef.current,
+      hasTimeout: !!silenceTimeoutRef.current,
+      isStarting: isStartingRef.current,
+      timeSinceLastStateChange: now - lastSpeechStateChange.current
+    });
+    
+    // Clear any pending timeouts
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    if (stateChangeTimeoutRef.current) {
+      clearTimeout(stateChangeTimeoutRef.current);
+      stateChangeTimeoutRef.current = null;
+    }
+    
+    isListeningRef.current = false;
+    isStartingRef.current = false;
+    dispatch(stopRecording());
+    await audioRecordingManager.stopRecording();
+  }, [dispatch, isListening, audioRecordingManager]);
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          // Remove the data URL prefix (e.g., "data:audio/wav;base64,")
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        } else {
+          reject(new Error('Failed to convert blob to base64'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const processAudio = useCallback(async (audioBlob: Blob) => {
+    if (audioBlob.size === 0) {
+      console.warn('⚠️ Empty audio blob received, skipping processing');
+      return;
+    }
+
     try {
       // Skip if already answered
       if (hasAnswered.current) {
+        console.log('Already answered, skipping audio processing');
         return;
       }
 
-      console.log('Processing audio...');
+      console.log('Processing audio...', { type: audioBlob.type, size: audioBlob.size });
 
-      // Check if audio is silent
-      const audioContext = new AudioContext();
-      const audioBuffer = await audioBlob.arrayBuffer();
-      const buffer = await audioContext.decodeAudioData(audioBuffer);
-      const channelData = buffer.getChannelData(0);
+      // Convert blob to base64
+      const base64Data = await blobToBase64(audioBlob);
+      
+      // Store in Redux
+      dispatch(setAudioData({
+        data: base64Data,
+        mimeType: audioBlob.type
+      }));
 
-      // Calculate RMS of the audio
-      let sumSquares = 0;
-      for (let i = 0; i < channelData.length; i++) {
-        sumSquares += channelData[i] * channelData[i];
-      }
-      const rms = Math.sqrt(sumSquares / channelData.length);
+      // Your existing evaluation logic
+      const evaluationService = AnswerEvaluationService.getInstance();
+      const result = await evaluationService.evaluateAnswer(base64Data, text, expectedAnswer,
+      );
 
-      console.log('RMS:', rms);
-      if (rms < 0.03) {
-        console.log('🔇 Audio is too silent, skipping evaluation');
-        return;
-      }
-
-      // If we have an expected answer, evaluate it
-      if (expectedAnswer && onEvaluated) {
-        const evaluationService = AnswerEvaluationService.getInstance();
-        const result = await evaluationService.evaluateAnswer(audioBlob, text, expectedAnswer);
-
-        // Stop listening before giving feedback
-        stopListening();
+      if (result.success) {
         hasAnswered.current = true;
-
-        // Speak feedback
-        const feedbackText = result.feedback + (result.suggestion ? ` ${result.suggestion}` : '');
-        dispatch(setFeedbackText(feedbackText));
-        speakFeedback(feedbackText);
-
-        // Call onEvaluated after starting feedback
-        onEvaluated(result);
+        onEvaluated?.(result);
       }
     } catch (error) {
       console.error('Error processing audio:', error);
     }
-  };
-
-  const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      console.log('⏹️ Stopping recording...');
-      audioRecordingManager.stopRecording();
-      dispatch(stopRecording());
-      isListeningRef.current = false;
-      console.log('✅ Recording stopped');
-    } else {
-      console.log('ℹ️ No active recording to stop');
-    }
-  }, [dispatch, stopRecording, audioRecordingManager]);
+  }, [dispatch, expectedAnswer, onEvaluated, text]);
 
   const detectSilence = useCallback((analyser: AnalyserNode) => {
     const bufferLength = analyser.fftSize;
-    const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(dataArray);
+    const dataArray = new Float32Array(bufferLength);
+    analyser.getFloatTimeDomainData(dataArray);
 
-    // Calculate RMS value
     let sumSquares = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      const value = dataArray[i] - 128;
+    for (const value of dataArray) {
       sumSquares += value * value;
     }
     const rms = Math.sqrt(sumSquares / bufferLength);
 
     // Update global audio level (normalized between 0 and 1)
     const baseLevel = rms / 128;
-    // If it's near silence, keep it very low
-    // For normal speech, center around 0.3-0.7
-    // Use exponential curve to make middle values more common
     const normalizedLevel = 0.1 + (Math.pow(baseLevel, 0.3) * 3);
-    setAudioLevel(Math.min(normalizedLevel, 0.9));
+    const finalLevel = Math.min(normalizedLevel, 0.9);
+    setAudioLevel(finalLevel);
 
-    // Log audio level every 500ms to avoid console spam
-    if (Date.now() % 500 < 50) {
-      console.log('🎤 Audio level (RMS):', rms.toFixed(2), 'Threshold:', settings.silenceThreshold);
+    // Always log the first few samples, then every 500ms
+    const now = Date.now();
+    if (silenceDetectionStartTime.current === 0) {
+      silenceDetectionStartTime.current = now;
+    }
+    
+    const threshold = Math.abs(settings.silenceThreshold);
+    const isSilent = finalLevel < threshold;
+    
+    if (now - silenceDetectionStartTime.current < 1000 || now % 500 < 50) {
+      console.log('🎤 Audio Levels:', {
+        rms: rms.toFixed(4),
+        baseLevel: baseLevel.toFixed(4),
+        normalized: normalizedLevel.toFixed(4),
+        final: finalLevel.toFixed(4),
+        threshold: threshold.toFixed(4),
+        isSilent
+      });
     }
 
-    if (rms < Math.abs(settings.silenceThreshold)) {
-      if (silenceTimeoutRef.current === null) {
-        console.log('🔇 Silence detected! Level:', rms.toFixed(2), 'below threshold:', settings.silenceThreshold);
+    // Check for silence
+    if (isSilent) {
+      console.log('📊 Silence check:', { 
+        finalLevel: finalLevel.toFixed(4), 
+        threshold: threshold.toFixed(4),
+        hasTimeout: !!silenceTimeoutRef.current,
+        isListening: isListeningRef.current
+      });
+      
+      if (!silenceTimeoutRef.current && isListeningRef.current) {
+        console.log('🤫 Silence detected, starting timeout...');
         silenceTimeoutRef.current = setTimeout(() => {
-          console.log('⏱️ Silence timeout reached. Stopping recording...');
-          stopListening();
-        }, 3000);
+          console.log('⏰ Timeout callback triggered');
+          if (isListeningRef.current) {
+            console.log('🔇 Silence timeout reached, stopping recording...');
+            stopListening();
+          } else {
+            console.log('⚠️ Not stopping - already stopped');
+          }
+        }, 1500);
       }
     } else {
       if (silenceTimeoutRef.current) {
-        console.log('🔊 Sound detected! Level:', rms.toFixed(2), 'above threshold:', settings.silenceThreshold);
+        console.log('🗣️ Audio detected, clearing silence timeout');
         clearTimeout(silenceTimeoutRef.current);
         silenceTimeoutRef.current = null;
       }
@@ -163,72 +212,134 @@ export function useSpeechInteraction({
   }, [settings.silenceThreshold, stopListening]);
 
   const startListening = useCallback(async () => {
-    if (!isListening) {
+    // Prevent rapid start/stop cycles
+    const now = Date.now();
+    if (now - lastSpeechStateChange.current < 500) {
+      console.log('⏱️ Ignoring start request - too soon after state change');
+      return;
+    }
+
+    if (isStartingRef.current) {
+      console.log('⏳ Already starting recording, ignoring request');
+      return;
+    }
+
+    if (!isListening && !isListeningRef.current) {
       try {
-        console.log('🎯 Starting audio recording...');
+        isStartingRef.current = true;
+        lastSpeechStateChange.current = now;
+        
+        console.log('🎯 Starting audio recording...', {
+          timeSinceLastStateChange: now - lastSpeechStateChange.current,
+          isListening,
+          isListeningRef: isListeningRef.current
+        });
+        
         console.log('🎤 Requesting microphone access...');
-        audioRecordingManager.startRecording({
+        
+        await audioRecordingManager.startRecording({
           deviceId: settings.devices[0],
           onDataAvailable: (blob: Blob) => {
-            console.log('💾 Recording completed. Audio size:', blob.size, 'bytes');
-            dispatch(setAudioBlob(blob));
-            processAudio(blob);
+            if (blob.size > 0) {
+              console.log('💾 Recording completed. Audio size:', blob.size, 'bytes');
+              processAudio(blob);
+            } else {
+              console.warn('⚠️ Empty recording received');
+            }
           },
           onStart: () => {
             dispatch(startRecording());
+            isListeningRef.current = true;
+            isStartingRef.current = false;
             console.log('▶️ Recording started');
+
+            // Start silence detection after a short delay to ensure analyzer is ready
+            if (stateChangeTimeoutRef.current) {
+              clearTimeout(stateChangeTimeoutRef.current);
+            }
+            
+            stateChangeTimeoutRef.current = setTimeout(() => {
+              if (!isListeningRef.current) {
+                console.log('⚠️ Recording stopped before silence detection could start');
+                return;
+              }
+
+              const analyser = audioRecordingManager.getAnalyser();
+              if (analyser) {
+                console.log('🎧 Starting silence detection loop');
+                silenceDetectionStartTime.current = 0;
+                const checkSilence = () => {
+                  if (isListeningRef.current) {
+                    detectSilence(analyser);
+                    requestAnimationFrame(checkSilence);
+                  } else {
+                    console.log('🛑 Silence detection loop stopped');
+                  }
+                };
+                checkSilence();
+              } else {
+                console.warn('⚠️ No analyser available for silence detection');
+              }
+            }, 1000); // Increased delay to ensure analyzer is ready
           },
           onError: (error: Error) => {
             console.error('❌ Error during recording:', error);
+            isListeningRef.current = false;
+            isStartingRef.current = false;
+            dispatch(stopRecording());
           }
         });
-
-        // Set up audio context and analyser
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        const source = audioContextRef.current.createMediaStreamSource(await navigator.mediaDevices.getUserMedia({ audio: { deviceId: settings.devices[0] } }));
-        source.connect(analyserRef.current);
-        console.log('🔧 Audio context and analyser set up');
-
-        // Configure analyser
-        analyserRef.current.fftSize = 2048;
-        analyserRef.current.minDecibels = -90;
-        analyserRef.current.maxDecibels = -10;
-        analyserRef.current.smoothingTimeConstant = 0.85;
-        console.log('⚙️ Analyser configured:', {
-          fftSize: analyserRef.current.fftSize,
-          minDecibels: analyserRef.current.minDecibels,
-          maxDecibels: analyserRef.current.maxDecibels
-        });
-
-        dispatch(startRecording());
-        isListeningRef.current = true;
-
-        // Start silence detection
-        const checkSilence = () => {
-          if (analyserRef.current && isListeningRef.current) {
-            detectSilence(analyserRef.current);
-            requestAnimationFrame(checkSilence);
-          }
-        };
-        console.log('👂 Starting silence detection');
-        requestAnimationFrame(checkSilence);
 
       } catch (error) {
-        console.error('❌ Error during recording:', error);
+        console.error('❌ Error starting recording:', error);
+        isListeningRef.current = false;
+        isStartingRef.current = false;
+        dispatch(stopRecording());
       }
     } else {
-      console.log('⚠️ Already listening, ignoring start request');
+      console.log('⚠️ Already listening or starting, ignoring start request', {
+        isListening,
+        isListeningRef: isListeningRef.current,
+        isStarting: isStartingRef.current,
+        timeSinceLastStateChange: now - lastSpeechStateChange.current
+      });
     }
-  }, [isListening, settings.devices, detectSilence, dispatch, startRecording, audioRecordingManager, processAudio, setAudioBlob]);
+  }, [isListening, settings.devices, detectSilence, dispatch, audioRecordingManager, processAudio]);
+
+  // Set up speech state change handler
+  useEffect(() => {
+    const handleSpeechStateChange = async (isSpeaking: boolean) => {
+      const now = Date.now();
+      console.log('[useSpeechInteraction] Speech state changed:', isSpeaking, {
+        timeSinceLastChange: now - lastSpeechStateChange.current
+      });
+      
+      if (!isSpeaking) {
+        // Wait a bit before starting to listen to avoid race conditions
+        if (stateChangeTimeoutRef.current) {
+          clearTimeout(stateChangeTimeoutRef.current);
+        }
+        
+        stateChangeTimeoutRef.current = setTimeout(() => {
+          if (!isListeningRef.current && !isStartingRef.current) {
+            startListening();
+          }
+        }, 500);
+      }
+      
+      lastSpeechStateChange.current = now;
+    };
+
+    speechManager.setOnStateChange(handleSpeechStateChange);
+  }, [startListening, speechManager]);
 
   const speak = useCallback(() => {
     if (!isSpeaking && text) {
+      dispatch({ type: 'speech/startSpeaking' });
       speechManager.speak(text);
-      dispatch(startSpeaking());
       hasSpoken.current = true;
     }
-  }, [text, settings, isSpeaking, dispatch, startSpeaking, speechManager]);
+  }, [text, isSpeaking, dispatch, speechManager]);
 
   const speakFeedback = useCallback((feedbackText: string) => {
     if (!feedbackText) return;
@@ -238,10 +349,6 @@ export function useSpeechInteraction({
       dispatch(stopGivingFeedback());
     }
   }, [dispatch, startGivingFeedback, stopGivingFeedback, speechManager]);
-  // Reset hasAnswered when text changes
-  useEffect(() => {
-    hasAnswered.current = false;
-  }, [text]);
 
   return {
     speak,
@@ -253,4 +360,4 @@ export function useSpeechInteraction({
     isGivingFeedback,
     hasSpoken: hasSpoken.current
   };
-}
+};

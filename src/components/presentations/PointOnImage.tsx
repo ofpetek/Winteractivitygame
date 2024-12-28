@@ -97,7 +97,11 @@ export function PointOnImage({
   }, [speak]);
 
   // Start listening when speech ends
-  useEffect(() => {
+  useEffect(() =>
+  {
+    console.log('🎤 isSpeaking:', isSpeaking);
+    console.log('🎤 isGivingFeedback:', isGivingFeedback);
+    console.log('🎤 started:', started);
     if (started && !isSpeaking && !isGivingFeedback) {
       console.log('🎤 Speech ended, starting to listen...');
       startListening();

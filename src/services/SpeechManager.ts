@@ -5,6 +5,7 @@ export class SpeechManager {
   private isInitialized = false;
   private speakQueue: string[] = [];
   private isSpeaking = false;
+  private onStateChange?: (isSpeaking: boolean) => void;
 
   private constructor() {
     this.synth = window.speechSynthesis;
@@ -61,6 +62,15 @@ export class SpeechManager {
     return SpeechManager.instance;
   }
 
+  public setOnStateChange(callback: (isSpeaking: boolean) => void) {
+    this.onStateChange = callback;
+  }
+
+  private setSpeaking(value: boolean) {
+    this.isSpeaking = value;
+    this.onStateChange?.(value);
+  }
+
   private createUtterance(text: string): SpeechSynthesisUtterance {
     const utterance = new SpeechSynthesisUtterance(text);
     const voice = this.getGermanVoice();
@@ -84,22 +94,24 @@ export class SpeechManager {
       return;
     }
 
-    this.isSpeaking = true;
+    this.setSpeaking(true);
     const text = this.speakQueue.shift()!;
 
     try {
       await new Promise<void>((resolve, reject) => {
         const utterance = this.createUtterance(text);
 
-        utterance.onend = () => {
-          this.isSpeaking = false;
+        utterance.onend = () =>
+        {
+          console.log('[SpeechManager] Speech ended');
+          this.setSpeaking(false);
           resolve();
           // Process next item in queue
           this.processQueue();
         };
 
         utterance.onerror = (event) => {
-          this.isSpeaking = false;
+          this.setSpeaking(false);
           reject(event);
           // Process next item in queue even if there's an error
           this.processQueue();
@@ -112,7 +124,7 @@ export class SpeechManager {
       });
     } catch (error) {
       console.error('[SpeechManager] Error speaking:', error);
-      this.isSpeaking = false;
+      this.setSpeaking(false);
     }
   }
 
